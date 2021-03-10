@@ -130,13 +130,13 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
         defer = function(tbl, callback) table.insert(deferred, callback) end,
       }})
 
-  local function process_patch(node, patchversion, prev, offset, deleted)
+  local function process_patch(node, patchversion, prev, offset, isdeleted)
     if #patches == 0 then return false end -- nothing to process further
     local addidx, delcnt, val = table.unpack(patches[1])
     local hasparts = node.parts:any(function(_, part) return isanc(part.version) end)
 
     -- this element is already deleted
-    if deleted then
+    if isdeleted then
       -- this patch only adds elements at the current offset
       if delcnt == 0 and addidx == offset then
         if #node.elems == 0 and hasparts then return end

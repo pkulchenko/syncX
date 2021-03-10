@@ -86,7 +86,7 @@ local metadags = {__index = {
     getvalue = function(node, isanc)
       isanc = isanc or function() return true end  
       local values = {}
-      traverse_space_dag(node, isanc, function(node, version, prev, offset, deleted)
+      traverse_space_dag(node, isanc, function(node, _, _, _, deleted)
           if not deleted then table.insert(values, table.concat(node.elems, "")) end
         end)
       return table.concat(values)
@@ -128,7 +128,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
           -- process deferred callbacks (for example, node splits)
           while #deferred > 0 do table.remove(deferred, 1)() end
         end,
-        defer = function(tbl, callback) table.insert(deferred, callback) end,
+        defer = function(_, callback) table.insert(deferred, callback) end,
       }})
 
   local function process_patch(node, patchversion, prev, offset, isdeleted)

@@ -87,7 +87,9 @@ local metadags = {__index = {
     getvalue = function(node, isanc)
       isanc = isanc or function() return true end  
       local values = {}
-      traverse_space_dag(node, isanc, function(node) table.insert(values, table.concat(node.elems, "")) end)
+      traverse_space_dag(node, isanc, function(node, version, prev, offset, deleted)
+          if not deleted then table.insert(values, table.concat(node.elems, "")) end
+        end)
       return table.concat(values)
     end,
   }}
@@ -105,10 +107,10 @@ local function create_space_dag_node(version, elems, deletedby)
 end
 
 local function space_dag_break_node(node, splitidx, newpart)
-  local tail = create_space_dag_node(nil, node.elems:slice(splitidx), node.deletedby:copy())
+  local tail = create_space_dag_node(nil, node.elems:slice(splitidx+1), node.deletedby:copy())
   tail.parts = node.parts
 
-  node.elems = setmetatable(node.elems:slice(1, splitidx-1), getmetatable(node.elems))
+  node.elems = setmetatable(node.elems:slice(1, splitidx), getmetatable(node.elems))
   node.parts = setmetatable(newpart and {newpart} or {}, getmetatable(tail.parts))
   node.parts[0] = tail
   return tail
@@ -117,10 +119,21 @@ end
 -- add a patchset to a node, which will have `nodeversion` after patching
 local function space_dag_add_patchset(node, nodeversion, patches, isanc)
   isanc = isanc or function() return true end
-  local pidx = 1
+  local deleteupto = 0 -- position to delete elements up to
+  local deferred = {} -- list of deferred callbacks
+  setmetatable(patches, {__index = {
+        done = function(tbl)
+          table.remove(tbl, 1) -- remove the processed patch
+          deleteupto = 0 -- reset delete tracker, as it's calculated per patch
+          -- process deferred callbacks (for example, node splits)
+          while #deferred > 0 do table.remove(deferred, 1)() end
+        end,
+        defer = function(tbl, callback) table.insert(deferred, callback) end,
+      }})
+
   local function process_patch(node, patchversion, prev, offset, deleted)
-    if pidx > #patches then return false end -- nothing to process further
-    local addidx, delcnt, val = table.unpack(patches[pidx])
+    if #patches == 0 then return false end -- nothing to process further
+    local addidx, delcnt, val = table.unpack(patches[1])
     local hasparts = node.parts:any(function(_, part) return isanc(part.version) end)
 
     -- this element is already deleted
@@ -128,13 +141,9 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       -- this patch only adds elements at the current offset
       if delcnt == 0 and addidx == offset then
         if #node.elems == 0 and hasparts then return end
-        local newnode = create_space_dag_node(nodeversion, val)
-        if #node.elems == 0 then
-          node.parts:spliceinto(newnode)
-        else
-          space_dag_break_node(node, 1, newnode)
-        end
-        pidx = pidx + 1
+        if #node.elems > 0 then space_dag_break_node(node, 0) end
+        node.parts:spliceinto(create_space_dag_node(nodeversion, val))
+        patches:done()
       end
       return
     end
@@ -144,13 +153,47 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       local d = addidx - (offset + #node.elems)
       if d > 0 then return end -- trying to add beyond the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
-      local newnode = create_space_dag_node(nodeversion, val)
-      if d == 0 then
-        node.parts:spliceinto(newnode)
+      if d ~= 0 then space_dag_break_node(node, addidx - offset) end
+      node.parts:spliceinto(create_space_dag_node(nodeversion, val))
+      patches:done()
+      return
+    end
+
+    if deleteupto <= offset then
+      local d = addidx - (offset + #node.elems)
+      if d >= 0 then return end -- trying to add at or beyond the max index
+      deleteupto = addidx + delcnt
+
+      if val then
+        local newnode = create_space_dag_node(nodeversion, val)
+        if addidx == offset and prev then
+          -- defer updates, otherwise inserted nodes affect position tracking
+          patches:defer(function() node.parts:spliceinto(newnode) end)
+          -- fall through to the next check for `deleteupto`
+        else
+          space_dag_break_node(node, addidx - offset)
+          -- defer updates, otherwise inserted nodes affect position tracking
+          patches:defer(function() node.parts:spliceinto(newnode) end)
+          return
+        end
       else
-        space_dag_break_node(node, addidx - offset + 1, newnode)
+        if addidx == offset then
+          -- fall through to the next check for `deleteupto`
+        else
+          space_dag_break_node(node, addidx - offset)
+          return
+        end
       end
-      pidx = pidx + 1
+    end
+
+    if deleteupto > offset then
+      if deleteupto <= offset + #node.elems then
+        if deleteupto < offset + #node.elems then
+          space_dag_break_node(node, deleteupto - offset)
+        end
+        patches:done()
+      end
+      node.deletedby[nodeversion] = true
       return
     end
   end

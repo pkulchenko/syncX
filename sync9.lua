@@ -69,6 +69,34 @@ local function traverse_space_dag(node, isanc, callback)
   return helper(node, node.version)
 end
 
+local function space_dag_get(node, index, is_anc)
+  -- index value is 0-based
+  local value
+  local offset = 0
+  traverse_space_dag(node, is_anc or function() return true end,
+    function(node)
+      if (index - offset < #node.elems) then
+        value = node.elems[index - offset + 1]
+        return false
+      end
+      offset = offset + #node.elems
+    end)
+  return value
+end
+
+local function space_dag_set(node, index, value, is_anc)
+  -- index value is 0-based
+  local offset = 0
+  traverse_space_dag(node, is_anc or function() return true end,
+    function(node)
+      if (index - offset < #node.elems) then
+        node.elems[index - offset + 1] = value
+        return false
+      end
+      offset = offset + #node.elems
+    end)
+end
+
 local metaparts = {__index = {
     splice = splice,
     slice = function(...) return {table.unpack(...)} end,
@@ -91,6 +119,8 @@ local metadags = {__index = {
         end)
       return table.concat(values)
     end,
+    get = space_dag_get,
+    set = space_dag_set,
   }}
 
 local function create_space_dag_node(version, elems, deletedby)

@@ -106,11 +106,12 @@ local function create_space_dag_node(version, elems, deletedby)
 end
 
 local function space_dag_break_node(node, splitidx, newpart)
+  assert(splitidx >= 0)
   local tail = create_space_dag_node(nil, node.elems:slice(splitidx+1), node.deletedby:copy())
   tail.parts = node.parts
 
   node.elems = setmetatable(node.elems:slice(1, splitidx), getmetatable(node.elems))
-  node.parts = setmetatable(newpart and {newpart} or {}, getmetatable(tail.parts))
+  node.parts = setmetatable(newpart and {newpart} or {}, getmetatable(node.parts))
   node.parts[0] = tail
   return tail
 end
@@ -149,8 +150,9 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
 
     -- nothing is being deleted, but need to do an insert
     if delcnt == 0 then
+      if addidx < offset then return end -- trying to insert before the current offset
       local d = addidx - (offset + #node.elems)
-      if d > 0 then return end -- trying to add beyond the max index
+      if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset) end
       node.parts:spliceinto(create_space_dag_node(nodeversion, val))
@@ -160,7 +162,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
 
     if deleteupto <= offset then
       local d = addidx - (offset + #node.elems)
-      if d >= 0 then return end -- trying to add at or beyond the max index
+      if d >= 0 then return end -- trying to insert at or after the max index
       deleteupto = addidx + delcnt
 
       if val then

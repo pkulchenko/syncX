@@ -59,8 +59,7 @@ local function traverse_space_dag(node, isanc, callback)
   local function helper(node, version, prev)
     local deleted = node.deletedby:any(function(version) return isanc(version) end)
     -- callback may return `false` to indicate that traversal needs to be stopped
-    if callback(node, version, prev, offset, deleted) == false then
-      return false end
+    if callback(node, version, prev, offset, deleted) == false then return false end
     if not deleted then offset = offset + #node.elems end
     for _, part in ipairs(node.parts) do
       if isanc(part.version) and helper(part, part.version) == false then return false end
@@ -98,12 +97,12 @@ local function create_space_dag_node(version, elems, deletedby)
   assert(not elems or type(elems) == "table")
   assert(not deletedby or type(deletedby) == "table")
   return setmetatable({
-    version = version, -- node version as a string
-    elems = setmetatable(elems or {}, metaparts), -- list of elements this node stores
-    deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
-    parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
-    -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
-  }, metadags)
+      version = version, -- node version as a string
+      elems = setmetatable(elems or {}, metaparts), -- list of elements this node stores
+      deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
+      parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
+      -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
+      }, metadags)
 end
 
 local function space_dag_break_node(node, splitidx, newpart)

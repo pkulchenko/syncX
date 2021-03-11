@@ -1,3 +1,8 @@
+--
+-- Implementation of Sync9 algorithm based on sync9.js from https://github.com/braid-org/braidjs
+-- Copyright 2021 Paul Kulchenko
+--
+
 local function argcheck(cond, i, f, extra)
   if not cond then
     error("bad argument #"..i.." to '"..f.."' ("..extra..")", 0)

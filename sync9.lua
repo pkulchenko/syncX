@@ -158,7 +158,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
   local deferred = {} -- list of deferred callbacks
   local deletedcnt = 0 -- number of deleted elements in the current patchset
   setmetatable(patches, {__index = {
-        done = function(tbl)
+        next = function(tbl)
           table.remove(tbl, 1) -- remove the processed patch
           deleteupto = 0 -- reset delete tracker, as it's calculated per patch
           -- process deferred callbacks (for example, node splits)
@@ -183,7 +183,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
         if #node.elems == 0 and hasparts then return end
         if #node.elems > 0 then space_dag_break_node(node, 0) end
         node.parts:spliceinto(create_space_dag_node(nodeversion, val))
-        patches:done()
+        patches:next()
       end
       return
     end
@@ -196,7 +196,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset) end
       node.parts:spliceinto(create_space_dag_node(nodeversion, val))
-      patches:done()
+      patches:next()
       return
     end
 
@@ -234,7 +234,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
           -- increase the number of deleted elements subtracting the number of added ones
           deletedcnt = deletedcnt + #node.elems - #val
         end
-        patches:done()
+        patches:next()
       end
       node.deletedby[nodeversion] = true
       return

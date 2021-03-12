@@ -17,7 +17,7 @@ is(dag:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no addition
 -- testing deletes
 dag = sync9.createnode("0", {'X', '1', '2', '3'})
 is(dag:getvalue(), "X123", "Initial node created.")
-dag:addpatchset("20", {{1, 2, {'A'}}, {3, 0, {'B'}}})
+dag:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B'}}})
 is(dag:getvalue(), "XAB3", "Patchset processed with two patches with elements added and deleted.")
 dag:addpatchset("30", {{2, 2, {}}})
 is(dag:getvalue(), "XA", "Patch processed with 2 elements deleted.")

@@ -156,6 +156,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
   isanc = isanc or function() return true end
   local deleteupto = 0 -- position to delete elements up to
   local deferred = {} -- list of deferred callbacks
+  local deletedcnt = 0 -- number of deleted elements in the current patchset
   setmetatable(patches, {__index = {
         done = function(tbl)
           table.remove(tbl, 1) -- remove the processed patch
@@ -170,6 +171,10 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
     if #patches == 0 then return false end -- nothing to process further
     local addidx, delcnt, val = table.unpack(patches[1])
     local hasparts = node.parts:any(function(_, part) return isanc(part.version) end)
+    -- since the patches in the patchset are processed as independent patches
+    -- (even though the graph is only traversed once),
+    -- adjust the offset for the number of deletes to use the correct position
+    offset = offset - deletedcnt
 
     -- this element is already deleted
     if isdeleted then
@@ -226,6 +231,8 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       if deleteupto <= offset + #node.elems then
         if deleteupto < offset + #node.elems then
           space_dag_break_node(node, deleteupto - offset)
+          -- increase the number of deleted elements subtracting the number of added ones
+          deletedcnt = deletedcnt + #node.elems - #val
         end
         patches:done()
       end

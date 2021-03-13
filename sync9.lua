@@ -124,8 +124,8 @@ local metanodes = {__index = {
     getvalue = function(node, isanc)
       isanc = isanc or function() return true end  
       local values = {}
-      traverse_space_dag(node, isanc, function(node, _, _, _, deleted)
-          if not deleted then table.insert(values, node.elems:getvalue()) end
+      traverse_space_dag(node, isanc, function(node, _, _, offset, deleted)
+          if not deleted then table.insert(values, node.elems:getvalue(offset)) end
         end)
       return table.concat(values)
     end,
@@ -138,7 +138,8 @@ local function create_space_dag_node(version, elems, deletedby)
   assert(not deletedby or type(deletedby) == "table")
   return setmetatable({
       version = version, -- node version as a string
-      elems = setmetatable(elems or {}, metaelems), -- list of elements this node stores
+      -- list of elements this node stores; keep its metatable if one is provided
+      elems = getmetatable(elems) and elems or setmetatable(elems or {}, metaelems),
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
       -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
@@ -147,7 +148,9 @@ end
 
 local function space_dag_break_node(node, splitidx, newpart)
   assert(splitidx >= 0)
-  local tail = create_space_dag_node(nil, node.elems:slice(splitidx+1), node.deletedby:copy())
+  local tail = create_space_dag_node(nil,
+    setmetatable(node.elems:slice(splitidx+1), getmetatable(node.elems)),
+    node.deletedby:copy())
   tail.parts = node.parts
 
   node.elems = setmetatable(node.elems:slice(1, splitidx), getmetatable(node.elems))

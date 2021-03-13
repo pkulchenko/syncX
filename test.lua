@@ -32,3 +32,18 @@ dag:addpatchset("30", {{1, 4, {}}})
 is(dag:getvalue(), "X3", "Patch processed with 2 elements deleted.")
 dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+
+-- testing embedded shallow processing
+local shallowdata = setmetatable({[0] = "X123"}, {__index = {
+    slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
+    getlength = function(tbl) return #tbl[0] end,
+    getvalue = function(tbl, offset) return tbl[0] end,
+}})
+dag = sync9.createnode("0", shallowdata)
+is(dag:getvalue(), "X123", "Initial node created with shallow embedded data.")
+dag:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+is(dag:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+dag:addpatchset("30", {{1, 4, {}}})
+is(dag:getvalue(), "X3", "Patch processed with 2 elements deleted.")
+dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
+is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")

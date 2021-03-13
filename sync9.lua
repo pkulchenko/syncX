@@ -113,7 +113,7 @@ local metadags = {__index = {
     getlength = function(node, isanc)
       isanc = isanc or function() return true end  
       local count = 0
-      traverse_space_dag(node, isanc, function(node) count = count + node.elems.length end)
+      traverse_space_dag(node, isanc, function(node) count = count + #node.elems end)
       return count
     end,
     getvalue = function(node, isanc)

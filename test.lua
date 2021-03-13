@@ -4,7 +4,8 @@ local sync9 = require "sync9"
 
 -- testing get/set methods
 dag = sync9.createnode("0", {'X', '1', '2', '3'})
-is(dag:getvalue(), "X123", "Initial node created.")
+is(dag:getvalue(), "X123", "Initial node created with expected value.")
+is(dag:getlength(), 4, "Initial node created with expected length.")
 dag:set(0, "0")
 is(dag:getvalue(), "0123", "Set processed.")
 is(dag:get(0), "0", "Get processed (1/2).")

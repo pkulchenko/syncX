@@ -65,7 +65,7 @@ local function traverse_space_dag(node, isanc, callback)
     local deleted = node.deletedby:any(function(version) return isanc(version) end)
     -- callback may return `false` to indicate that traversal needs to be stopped
     if callback(node, version, prev, offset, deleted) == false then return false end
-    if not deleted then offset = offset + #node.elems end
+    if not deleted then offset = offset + node.elems:getlength() end
     for _, part in ipairs(node.parts) do
       if isanc(part.version) and helper(part, part.version) == false then return false end
     end
@@ -80,11 +80,11 @@ local function space_dag_get(node, index, is_anc)
   local offset = 0
   traverse_space_dag(node, is_anc or function() return true end,
     function(node)
-      if (index - offset < #node.elems) then
+      if (index - offset < node.elems:getlength()) then
         value = node.elems[index - offset + 1]
         return false
       end
-      offset = offset + #node.elems
+      offset = offset + node.elems:getlength()
     end)
   return value
 end
@@ -94,11 +94,11 @@ local function space_dag_set(node, index, value, is_anc)
   local offset = 0
   traverse_space_dag(node, is_anc or function() return true end,
     function(node)
-      if (index - offset < #node.elems) then
+      if (index - offset < node.elems:getlength()) then
         node.elems[index - offset + 1] = value
         return false
       end
-      offset = offset + #node.elems
+      offset = offset + node.elems:getlength()
     end)
 end
 
@@ -109,18 +109,23 @@ local metaparts = {__index = {
     any = any, -- return `true` if any of the values match condition
     copy = function(tbl) return {table.unpack(tbl)} end,
   }}
-local metadags = {__index = {
+local metaelems = {__index = {
+    slice = function(...) return {table.unpack(...)} end,
+    getlength = function(tbl) return #tbl end,
+    getvalue = function(tbl) return table.concat(tbl, "") end,
+  }}
+local metanodes = {__index = {
     getlength = function(node, isanc)
       isanc = isanc or function() return true end  
       local count = 0
-      traverse_space_dag(node, isanc, function(node) count = count + #node.elems end)
+      traverse_space_dag(node, isanc, function(node) count = count + node.elems:getlength() end)
       return count
     end,
     getvalue = function(node, isanc)
       isanc = isanc or function() return true end  
       local values = {}
       traverse_space_dag(node, isanc, function(node, _, _, _, deleted)
-          if not deleted then table.insert(values, table.concat(node.elems, "")) end
+          if not deleted then table.insert(values, node.elems:getvalue()) end
         end)
       return table.concat(values)
     end,
@@ -133,11 +138,11 @@ local function create_space_dag_node(version, elems, deletedby)
   assert(not deletedby or type(deletedby) == "table")
   return setmetatable({
       version = version, -- node version as a string
-      elems = setmetatable(elems or {}, metaparts), -- list of elements this node stores
+      elems = setmetatable(elems or {}, metaelems), -- list of elements this node stores
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
       -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
-      }, metadags)
+      }, metanodes)
 end
 
 local function space_dag_break_node(node, splitidx, newpart)
@@ -169,6 +174,8 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
 
   local function process_patch(node, patchversion, prev, offset, isdeleted)
     if #patches == 0 then return false end -- nothing to process further
+    -- cache length, as all node-breaking/changing cases will call `return`
+    local nodelength = node.elems:getlength()
     local addidx, delcnt, val = table.unpack(patches[1])
     local hasparts = node.parts:any(function(_, part) return isanc(part.version) end)
     -- since the patches in the patchset are processed as independent patches
@@ -180,8 +187,8 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
     if isdeleted then
       -- this patch only adds elements at the current offset
       if delcnt == 0 and addidx == offset then
-        if #node.elems == 0 and hasparts then return end
-        if #node.elems > 0 then space_dag_break_node(node, 0) end
+        if nodelength == 0 and hasparts then return end
+        if nodelength > 0 then space_dag_break_node(node, 0) end
         node.parts:spliceinto(create_space_dag_node(nodeversion, val))
         patches:next()
       end
@@ -191,7 +198,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
     -- nothing is being deleted, but need to do an insert
     if delcnt == 0 then
       if addidx < offset then return end -- trying to insert before the current offset
-      local d = addidx - (offset + #node.elems)
+      local d = addidx - (offset + nodelength)
       if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset) end
@@ -201,7 +208,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
     end
 
     if deleteupto <= offset then
-      local d = addidx - (offset + #node.elems)
+      local d = addidx - (offset + nodelength)
       if d >= 0 then return end -- trying to insert at or after the max index
       deleteupto = addidx + delcnt
 
@@ -228,11 +235,11 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
     end
 
     if deleteupto > offset then
-      if deleteupto <= offset + #node.elems then
-        if deleteupto < offset + #node.elems then
+      if deleteupto <= offset + nodelength then
+        if deleteupto < offset + nodelength then
           space_dag_break_node(node, deleteupto - offset)
           -- increase the number of deleted elements subtracting the number of added ones
-          deletedcnt = deletedcnt + #node.elems - #val
+          deletedcnt = deletedcnt + deleteupto - offset - #val
         end
         patches:next()
       end
@@ -243,7 +250,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
   traverse_space_dag(node, isanc, process_patch)
 end
 
-metadags.__index.addpatchset = space_dag_add_patchset
+metanodes.__index.addpatchset = space_dag_add_patchset
 
 return {
   createnode = create_space_dag_node,  

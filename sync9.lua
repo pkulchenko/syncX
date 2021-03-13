@@ -102,6 +102,7 @@ local function space_dag_set(node, index, value, is_anc)
     end)
 end
 
+local create_space_dag_node -- forward declaration
 local metaparts = {__index = {
     splice = splice,
     slice = function(...) return {table.unpack(...)} end,
@@ -129,11 +130,27 @@ local metanodes = {__index = {
         end)
       return table.concat(values)
     end,
+    sethandler = function(node, handlers)
+      local mt = getmetatable(node)
+      if not mt or not mt.__index then return end
+      for k, v in pairs(handlers) do
+        getmetatable(node).__index["on"..k] = v
+      end
+    end,
+    insert = function(node, nodeversion, val, idx)
+      node.parts:spliceinto(create_space_dag_node(nodeversion, val))
+      node:oninsert(nodeversion, idx, val)
+    end,
+    delete = function(node, nodeversion, length, idx)
+      node:ondelete(nodeversion, idx, length)
+    end,
+    oninsert = function() end,
+    ondelete = function() end,
     get = space_dag_get,
     set = space_dag_set,
   }}
 
-local function create_space_dag_node(version, elems, deletedby)
+create_space_dag_node = function(version, elems, deletedby)
   assert(not elems or type(elems) == "table")
   assert(not deletedby or type(deletedby) == "table")
   return setmetatable({
@@ -172,7 +189,9 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
           -- process deferred callbacks (for example, node splits)
           while #deferred > 0 do table.remove(deferred, 1)() end
         end,
-        defer = function(_, callback) table.insert(deferred, callback) end,
+        defer = function(_, callback, unshift)
+          table.insert(deferred, unshift and 1 or #deferred+1, callback)
+        end,
       }})
 
   local function process_patch(node, patchversion, prev, offset, isdeleted)
@@ -192,7 +211,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       if delcnt == 0 and addidx == offset then
         if nodelength == 0 and hasparts then return end
         if nodelength > 0 then space_dag_break_node(node, 0) end
-        node.parts:spliceinto(create_space_dag_node(nodeversion, val))
+        node:insert(nodeversion, val, addidx)
         patches:next()
       end
       return
@@ -205,7 +224,7 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset) end
-      node.parts:spliceinto(create_space_dag_node(nodeversion, val))
+      node:insert(nodeversion, val, addidx)
       patches:next()
       return
     end
@@ -216,15 +235,14 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
       deleteupto = addidx + delcnt
 
       if val then
-        local newnode = create_space_dag_node(nodeversion, val)
         if addidx == offset and prev then
           -- defer updates, otherwise inserted nodes affect position tracking
-          patches:defer(function() node.parts:spliceinto(newnode) end)
+          patches:defer(function() node:insert(nodeversion, val, addidx) end)
           -- fall through to the next check for `deleteupto`
         else
           space_dag_break_node(node, addidx - offset)
           -- defer updates, otherwise inserted nodes affect position tracking
-          patches:defer(function() node.parts:spliceinto(newnode) end)
+          patches:defer(function() node:insert(nodeversion, val, addidx) end)
           return
         end
       else
@@ -244,13 +262,19 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
           -- increase the number of deleted elements subtracting the number of added ones
           deletedcnt = deletedcnt + deleteupto - offset - #val
         end
+        -- defer delete processing, as it needs to be processed in the opposite order
+        patches:defer(function() node:delete(nodeversion, node.elems:getlength(), offset) end, true)
         patches:next()
+      else
+        -- defer delete processing, as it needs to be processed in the opposite order
+        patches:defer(function() node:delete(nodeversion, node.elems:getlength(), offset) end, true)
       end
       node.deletedby[nodeversion] = true
       return
     end
   end
   traverse_space_dag(node, isanc, process_patch)
+  patches:next() -- process any outstanding deferred actions
 end
 
 metanodes.__index.addpatchset = space_dag_add_patchset

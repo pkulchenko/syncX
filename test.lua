@@ -29,21 +29,49 @@ is(dag:getvalue(), "X123", "Initial node created.")
 dag:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(dag:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 dag:addpatchset("30", {{1, 4, {}}})
-is(dag:getvalue(), "X3", "Patch processed with 2 elements deleted.")
+is(dag:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 
 -- testing embedded shallow processing
+-- the content is managed as a string instead of a table
 local shallowdata = setmetatable({[0] = "X123"}, {__index = {
-    slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
-    getlength = function(tbl) return #tbl[0] end,
-    getvalue = function(tbl, offset) return tbl[0] end,
-}})
+      slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
+      getlength = function(tbl) return #tbl[0] end,
+      getvalue = function(tbl, offset) return tbl[0] end,
+    }})
 dag = sync9.createnode("0", shallowdata)
 is(dag:getvalue(), "X123", "Initial node created with shallow embedded data.")
 dag:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(dag:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 dag:addpatchset("30", {{1, 4, {}}})
-is(dag:getvalue(), "X3", "Patch processed with 2 elements deleted.")
+is(dag:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+
+-- testing external shallow processing
+-- the content is managed as a string external to the graph
+local str = "X123"
+shallowdata = setmetatable({n = #str}, {__index = {
+      slice = function(tbl, i, j) return {n = (j or tbl.n) - i + 1} end,
+      getlength = function(tbl) return tbl.n end,
+      getvalue = function(tbl, offset) return str:sub(offset + 1, offset + tbl.n) end,
+    }})
+dag = sync9.createnode("0", shallowdata)
+-- set insert/delete handlers that are called when modifications are made
+dag:sethandler{
+  insert = function(node, version, offset, value)
+    str = str:sub(1, offset)..table.concat(value,"")..str:sub(offset+1)
+  end,
+  delete = function(node, version, offset, length)
+    str = str:sub(1, offset)..str:sub(offset+length+1)
+  end,
+}
+is(dag:getvalue(), "X123", "Initial node created with shallow embedded data.")
+dag:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+is(dag:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+dag:addpatchset("30", {{1, 4, {}}})
+is(dag:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
+is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+is(str, dag:getvalue(), "Direct comparison of external shallow data.")

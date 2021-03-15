@@ -102,7 +102,7 @@ local function space_dag_set(node, index, value, is_anc)
     end)
 end
 
-local create_space_dag_node -- forward declaration
+local create_space_dag_node, space_dag_add_patchset -- forward declarations
 local metaparts = {__index = {
     splice = splice,
     slice = function(...) return {table.unpack(...)} end,
@@ -115,42 +115,46 @@ local metaelems = {__index = {
     getlength = function(tbl) return #tbl end,
     getvalue = function(tbl) return table.concat(tbl, "") end,
   }}
-local metanodes = {__index = {
-    getlength = function(node, isanc)
-      isanc = isanc or function() return true end  
-      local count = 0
-      traverse_space_dag(node, isanc, function(node) count = count + node.elems:getlength() end)
-      return count
-    end,
-    getvalue = function(node, isanc)
-      isanc = isanc or function() return true end  
-      local values = {}
-      traverse_space_dag(node, isanc, function(node, _, _, offset, deleted)
-          if not deleted then table.insert(values, node.elems:getvalue(offset)) end
-        end)
-      return table.concat(values)
-    end,
-    sethandler = function(node, handlers)
-      local mt = getmetatable(node)
-      if not mt or not mt.__index then return end
-      for k, v in pairs(handlers) do
-        getmetatable(node).__index["on"..k] = v
-      end
-    end,
-    insert = function(node, nodeversion, val, idx)
-      node.parts:spliceinto(create_space_dag_node(nodeversion, val))
-      node:oninsert(nodeversion, idx, val)
-    end,
-    delete = function(node, nodeversion, length, idx)
-      node:ondelete(nodeversion, idx, length)
-    end,
-    oninsert = function() end,
-    ondelete = function() end,
-    get = space_dag_get,
-    set = space_dag_set,
-  }}
+local function getmetanode()
+  -- return metatable from a function to control which nodes share metatables
+  return {__index = {
+      addpatchset = space_dag_add_patchset,
+      getlength = function(node, isanc)
+        isanc = isanc or function() return true end
+        local count = 0
+        traverse_space_dag(node, isanc, function(node) count = count + node.elems:getlength() end)
+        return count
+      end,
+      getvalue = function(node, isanc)
+        isanc = isanc or function() return true end
+        local values = {}
+        traverse_space_dag(node, isanc, function(node, _, _, offset, deleted)
+            if not deleted then table.insert(values, node.elems:getvalue(offset)) end
+          end)
+        return table.concat(values)
+      end,
+      sethandler = function(node, handlers)
+        local mt = getmetatable(node)
+        if not mt or not mt.__index then return end
+        for k, v in pairs(handlers) do
+          getmetatable(node).__index["on"..k] = v
+        end
+      end,
+      insert = function(node, nodeversion, val, idx)
+        node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+        node:oninsert(nodeversion, idx, val)
+      end,
+      delete = function(node, nodeversion, length, idx)
+        node:ondelete(nodeversion, idx, length)
+      end,
+      oninsert = function() end,
+      ondelete = function() end,
+      get = space_dag_get,
+      set = space_dag_set,
+    }}
+end
 
-create_space_dag_node = function(version, elems, deletedby)
+create_space_dag_node = function(node, version, elems, deletedby)
   assert(not elems or type(elems) == "table")
   assert(not deletedby or type(deletedby) == "table")
   return setmetatable({
@@ -160,12 +164,12 @@ create_space_dag_node = function(version, elems, deletedby)
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
       -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
-      }, metanodes)
+      }, node and getmetatable(node) or getmetanode())
 end
 
 local function space_dag_break_node(node, splitidx, newpart)
   assert(splitidx >= 0)
-  local tail = create_space_dag_node(nil,
+  local tail = create_space_dag_node(node, nil,
     setmetatable(node.elems:slice(splitidx+1), getmetatable(node.elems)),
     node.deletedby:copy())
   tail.parts = node.parts
@@ -177,7 +181,7 @@ local function space_dag_break_node(node, splitidx, newpart)
 end
 
 -- add a patchset to a node, which will have `nodeversion` after patching
-local function space_dag_add_patchset(node, nodeversion, patches, isanc)
+space_dag_add_patchset = function(node, nodeversion, patches, isanc)
   isanc = isanc or function() return true end
   local deleteupto = 0 -- position to delete elements up to
   local deferred = {} -- list of deferred callbacks
@@ -277,8 +281,6 @@ local function space_dag_add_patchset(node, nodeversion, patches, isanc)
   patches:next() -- process any outstanding deferred actions
 end
 
-metanodes.__index.addpatchset = space_dag_add_patchset
-
 return {
-  createnode = create_space_dag_node,  
+  createnode = function(...) return create_space_dag_node(nil, ...) end,
 }

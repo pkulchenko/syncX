@@ -75,3 +75,23 @@ is(dag:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 dag:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(dag:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 is(str, dag:getvalue(), "Direct comparison of external shallow data.")
+
+-- test handler independence
+local updated
+local dag1 = sync9.createnode("0", {'A'})
+dag1:sethandler{
+  insert = function(node, version, offset, value)
+    updated = "Updated 1 with version "..version
+  end,
+}
+local dag2 = sync9.createnode("0", {'A'})
+dag2:sethandler{
+  insert = function(node, version, offset, value)
+    updated = "Updated 2 with version "..version
+  end,
+}
+
+dag1:addpatchset("10", {{1, 0, {'B'}}})
+is(updated, "Updated 1 with version 10", "Different root nodes have different handlers (1/2).")
+dag2:addpatchset("20", {{1, 0, {'B'}}})
+is(updated, "Updated 2 with version 20", "Different root nodes have different handlers (2/2).")

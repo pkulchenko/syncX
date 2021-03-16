@@ -60,11 +60,14 @@ shallowdata = setmetatable({n = #str}, {__index = {
     }})
 node = sync9.createnode("0", shallowdata)
 -- set insert/delete handlers that are called when modifications are made
+local callbacks = {}
 node:sethandler{
   insert = function(node, version, offset, value)
+    table.insert(callbacks, {"ins", version, offset, value})
     str = str:sub(1, offset)..table.concat(value,"")..str:sub(offset+1)
   end,
   delete = function(node, version, offset, length)
+    table.insert(callbacks, {"del", version, offset, length})
     str = str:sub(1, offset)..str:sub(offset+length+1)
   end,
 }
@@ -73,6 +76,7 @@ node:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(node:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 node:addpatchset("30", {{1, 4, {}}})
 is(node:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+is(callbacks[#callbacks][1], "del", "Patch with delete doesn't trigger insert callback.")
 node:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(node:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 is(str, node:getvalue(), "Direct comparison of external shallow data.")

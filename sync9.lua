@@ -142,7 +142,7 @@ local function getmetanode()
       end,
       insert = function(node, nodeversion, val, idx)
         node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
-        node:oninsert(nodeversion, idx, val)
+        if #val > 0 then node:oninsert(nodeversion, idx, val) end
       end,
       delete = function(node, nodeversion, length, idx)
         node:ondelete(nodeversion, idx, length)

@@ -117,7 +117,7 @@ ok(not p1:equals(p2), "Tables with different content are not equal.")
 -- test linear versioning for resources
 resource = sync9.createresource()
 resource:addversion("00", {{0, 0, {'X', '1'}}})
-ok(resource.time["00"], "Resource version history is updated.")
+ok(resource:gettime("00"), "Resource version history is updated.")
 is(resource:getvalue(), "X1", "Initial resource created.")
 resource:addversion("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
 is(resource:getvalue(), "XABBA1", "Resource patchset processed with two patches inserted at different positions.")
@@ -127,7 +127,7 @@ resource:addversion("40", {{4, 0, {'D'}}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
 resource:addversion("50", {{1, 0, {}}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
-ok(resource.time["50"] and resource.time["50"]["40"], "Resource version history is updated with the parent version.")
+ok(resource:gettime("50") and resource:gettime("50")["40"], "Resource version history is updated with the parent version.")
 
 -- test branching versioning for resources
 resource = sync9.createresource()
@@ -146,3 +146,5 @@ is(resource:getvalue("10"), "XB1", "Resource returns value for specific version 
 is(resource:getvalue("20"), "XAA1", "Resource returns value for specific version (2/5).")
 is(resource:getvalue("30"), "XBACA1", "Resource returns value for specific version (4/5).")
 is(resource:getvalue("40"), "X1", "Resource returns value for specific version (5/5).")
+ok(resource:gettime("30") and resource:gettime("30")["10"] and resource:gettime("30")["20"],
+  "Resource version history is merged with multiple parent versions.")

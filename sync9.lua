@@ -349,6 +349,8 @@ local metaresource = {__index = {
       resource.space:addpatchset(version, patchset, isanc)
     end,
     sethandler = function(resource, ...) return resource.space:sethandler(...) end,
+    getspace = function(resource) return resource.space end,
+    gettime = function(resource, version) return resource.time[version] end,
     getpatchset = function(resource, version) end,
     addpatchset = function(resource, patchset) end,
   }}

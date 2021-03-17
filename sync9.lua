@@ -200,8 +200,9 @@ space_dag_add_patchset = function(node, nodeversion, patches, isanc)
 
   local function process_patch(node, patchversion, prev, offset, isdeleted)
     if #patches == 0 then return false end -- nothing to process further
-    -- cache length, as all node-breaking/changing cases will call `return`
+    -- get and cache length, as all node-breaking/changing cases will call `return`
     local nodelength = node.elems:getlength()
+    -- get the next path to work on
     local addidx, delcnt, val = table.unpack(patches[1])
     local hasparts = node.parts:any(function(_, part) return isanc(part.version) end)
     -- since the patches in the patchset are processed as independent patches
@@ -281,6 +282,87 @@ space_dag_add_patchset = function(node, nodeversion, patches, isanc)
   patches:next() -- process any outstanding deferred actions
 end
 
+local metaparents = {__index = {
+    copy = function(tbl)
+      local res = setmetatable({}, getmetatable(tbl))
+      for k, v in pairs(tbl) do res[k] = v end
+      return res
+    end,
+    equals = function(tbl1, tbl2)
+      if #tbl1 ~= #tbl2 then return false end
+      local val1, val2, key1, key2
+      while true do
+        key1, val1 = next(tbl1, key1)
+        key2, val2 = next(tbl2, key2)
+        if key1 == nil and key2 == nil then break end
+        if key1 ~= nil and tbl2[key1] ~= val1
+        or key2 ~= nil and tbl1[key2] ~= val2 then
+          return false
+        end
+      end
+      return true
+    end,
+  }}
+local metaresource = {__index = {
+    getvalue = function(resource, version)
+      local isanc
+      if version then
+        local ancestors = resource:getancestors({[version] = true})
+        ancestors[version] = true
+        isanc = function(nodeversion) return ancestors[nodeversion] end
+      end
+      return resource.space:getvalue(isanc)
+    end,
+    getancestors = function(resource, versions)
+      local results = {}
+      local function helper(version)
+        if results[version] then return end
+        if not resource.time[version] then return end -- ignore non-existent versions
+        results[version] = true
+        for ver in pairs(resource.time[version]) do helper(ver) end
+      end
+      for ver in pairs(versions) do helper(ver) end
+      return results
+    end,
+    addversion = function(resource, version, patchset, parents)
+      assert(#patchset > 0)
+      -- this version is already known
+      if resource.time[version] then return end
+
+      if not parents then parents = resource.futureparents:copy() end
+      resource.time[version] = parents
+
+      for parent in pairs(parents) do resource.futureparents[parent] = nil end
+      resource.futureparents[version] = true
+
+      if not next(parents) then
+        resource.space = create_space_dag_node(nil, version, patchset[1][3])
+        return
+      end
+
+      local isanc
+      -- shortcut with a simplified version for a frequently used case
+      if resource.futureparents:equals(parents) then
+        isanc = function() return true end
+      else
+        local ancestors = resource:getancestors(parents)
+        ancestors[version] = true
+        isanc = function(nodeversion) return ancestors[nodeversion] end
+      end
+      resource.space:addpatchset(version, patchset, isanc)
+    end,
+    getpatchset = function(resource, version) end,
+    addpatchset = function(resource, patchset) end,
+  }}
+
+local function createresource()
+  return setmetatable({
+      time = {},
+      futureparents = setmetatable({}, metaparents),
+      }, metaresource)
+end
+
 return {
   createnode = function(...) return create_space_dag_node(nil, ...) end,
+  createresource = createresource,
 }

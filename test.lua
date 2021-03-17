@@ -3,7 +3,7 @@ require "testwell"
 local sync9 = require "sync9"
 local node
 
--- testing get/set methods
+-- test get/set methods
 node = sync9.createnode("0", {'X', '1', '2', '3'})
 is(node:getvalue(), "X123", "Initial node created with expected value.")
 is(node:getlength(), 4, "Initial node created with expected length.")
@@ -12,7 +12,7 @@ is(node:getvalue(), "0123", "Set processed.")
 is(node:get(0), "0", "Get processed (1/2).")
 is(node:get(3), "3", "Get processed (2/2).")
 
--- testing inserts
+-- test inserts
 node = sync9.createnode("0", {'X', '1'})
 is(node:getvalue(), "X1", "Initial node created.")
 node:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
@@ -24,7 +24,7 @@ is(node:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at po
 node:addpatchset("50", {{1, 0, {}}})
 is(node:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
 
--- testing deletes
+-- test deletes
 node = sync9.createnode("0", {'X', '1', '2', '3'})
 is(node:getvalue(), "X123", "Initial node created.")
 node:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
@@ -34,7 +34,7 @@ is(node:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 node:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(node:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 
--- testing embedded shallow processing
+-- test embedded shallow processing
 -- the content is managed as a string instead of a table
 local shallowdata = setmetatable({[0] = "X123"}, {__index = {
       slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
@@ -50,7 +50,7 @@ is(node:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 node:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(node:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 
--- testing external shallow processing
+-- test external shallow processing
 -- the content is managed as a string external to the graph
 local str = "X123"
 shallowdata = setmetatable({n = #str}, {__index = {
@@ -99,3 +99,50 @@ node1:addpatchset("10", {{1, 0, {'B'}}})
 is(updated, "Updated 1 with version 10", "Different root nodes have different handlers (1/2).")
 node2:addpatchset("20", {{1, 0, {'B'}}})
 is(updated, "Updated 2 with version 20", "Different root nodes have different handlers (2/2).")
+
+-- test parent comparisons
+local resource = sync9.createresource()
+local p1 = resource.futureparents:copy()
+local p2 = resource.futureparents:copy()
+ok(p1:equals(p2), "Empty tables are equal.")
+p1.a = true
+p1.b = true
+ok(p1:equals(p1), "Table is equal to itself.")
+p2.b = true
+p2.a = true
+ok(p1:equals(p2), "Tables with the same content are equal.")
+p2.a = false
+ok(not p1:equals(p2), "Tables with different content are not equal.")
+
+-- test linear versioning for resources
+resource = sync9.createresource()
+resource:addversion("00", {{1, 0, {'X', '1'}}})
+ok(resource.time["00"], "Resource version history is updated.")
+is(resource.space:getvalue(), "X1", "Initial resource created.")
+resource:addversion("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
+is(resource.space:getvalue(), "XABBA1", "Resource patchset processed with two patches inserted at different positions.")
+resource:addversion("30", {{3, 0, {'C', 'C'}}})
+is(resource.space:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
+resource:addversion("40", {{4, 0, {'D'}}})
+is(resource.space:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
+resource:addversion("50", {{1, 0, {}}})
+is(resource.space:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
+ok(resource.time["50"] and resource.time["50"]["40"], "Resource version history is updated with the parent version.")
+
+-- test branching versioning for resources
+resource = sync9.createresource()
+resource:addversion("00", {{1, 0, {'X', '1'}}})
+is(resource.space:getvalue(), "X1", "Initial resource created.")
+resource:addversion("20", {{1, 0, {'A', 'A'}}}, {["00"] = true})
+is(resource.space:getvalue(), "XAA1", "Resource patch processed with explicit parent.")
+resource:addversion("10", {{1, 0, {'B'}}}, {["00"] = true})
+is(resource.space:getvalue(), "XBAA1", "Resource patch processed with a branching parent inserted earlier based on version number.")
+resource:addversion("30", {{3, 0, {'C'}}}, {["10"] = true, ["20"] = true})
+is(resource.space:getvalue(), "XBACA1", "Resource patch processed with a branching parent inserted later based on version number.")
+resource:addversion("40", {{1, 4}}, {["30"] = true})
+is(resource.space:getvalue(), "X1", "Resource patch processed with a delete.")
+is(resource:getvalue("00"), "X1", "Resource returns value for specific version (1/5).")
+is(resource:getvalue("10"), "XB1", "Resource returns value for specific version (3/5).")
+is(resource:getvalue("20"), "XAA1", "Resource returns value for specific version (2/5).")
+is(resource:getvalue("30"), "XBACA1", "Resource returns value for specific version (4/5).")
+is(resource:getvalue("40"), "X1", "Resource returns value for specific version (5/5).")

@@ -363,6 +363,6 @@ local function createresource()
 end
 
 return {
-  createnode = function(...) return create_space_dag_node(nil, ...) end,
+  createspace = function(...) return create_space_dag_node(nil, ...) end,
   createresource = createresource,
 }

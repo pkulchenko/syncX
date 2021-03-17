@@ -329,16 +329,13 @@ local metaresource = {__index = {
       -- this version is already known
       if resource.time[version] then return end
 
+      -- take the current version (future parents) if none are specified
       if not parents then parents = resource.futureparents:copy() end
       resource.time[version] = parents
 
+      -- delete current parents from future ones
       for parent in pairs(parents) do resource.futureparents[parent] = nil end
       resource.futureparents[version] = true
-
-      if not next(parents) then
-        resource.space = create_space_dag_node(nil, version, patchset[1][3])
-        return
-      end
 
       local isanc
       -- shortcut with a simplified version for a frequently used case
@@ -351,18 +348,23 @@ local metaresource = {__index = {
       end
       resource.space:addpatchset(version, patchset, isanc)
     end,
+    sethandler = function(resource, ...) return resource.space:sethandler(...) end,
     getpatchset = function(resource, version) end,
     addpatchset = function(resource, patchset) end,
   }}
 
-local function createresource()
+local M = {
+  createspace = function(...) return create_space_dag_node(nil, ...) end,
+}
+
+function M.createresource(version)
+  if not version then version = "0" end
   return setmetatable({
+      -- create root node
+      space = M.createspace(version),
       time = {},
-      futureparents = setmetatable({}, metaparents),
+      futureparents = setmetatable({[version] = true}, metaparents),
       }, metaresource)
 end
 
-return {
-  createspace = function(...) return create_space_dag_node(nil, ...) end,
-  createresource = createresource,
-}
+return M

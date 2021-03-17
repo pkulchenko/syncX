@@ -39,7 +39,7 @@ is(node:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added a
 local shallowdata = setmetatable({[0] = "X123"}, {__index = {
       slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
       getlength = function(tbl) return #tbl[0] end,
-      getvalue = function(tbl, offset) return tbl[0] end,
+      getvalue = function(tbl) return tbl[0] end,
     }})
 node = sync9.createnode("0", shallowdata)
 is(node:getvalue(), "X123", "Initial node created with shallow embedded data.")
@@ -62,11 +62,11 @@ node = sync9.createnode("0", shallowdata)
 -- set insert/delete handlers that are called when modifications are made
 local callbacks = {}
 node:sethandler{
-  insert = function(node, version, offset, value)
+  insert = function(version, offset, value)
     table.insert(callbacks, {"ins", version, offset, value})
     str = str:sub(1, offset)..table.concat(value,"")..str:sub(offset+1)
   end,
-  delete = function(node, version, offset, length)
+  delete = function(version, offset, length)
     table.insert(callbacks, {"del", version, offset, length})
     str = str:sub(1, offset)..str:sub(offset+length+1)
   end,
@@ -85,13 +85,13 @@ is(str, node:getvalue(), "Direct comparison of external shallow data.")
 local updated
 local node1 = sync9.createnode("0", {'A'})
 node1:sethandler{
-  insert = function(node, version, offset, value)
+  insert = function(version)
     updated = "Updated 1 with version "..version
   end,
 }
 local node2 = sync9.createnode("0", {'A'})
 node2:sethandler{
-  insert = function(node, version, offset, value)
+  insert = function(version)
     updated = "Updated 2 with version "..version
   end,
 }

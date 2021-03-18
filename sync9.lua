@@ -351,19 +351,17 @@ local metaresource = {__index = {
     sethandler = function(resource, ...) return resource.space:sethandler(...) end,
     getspace = function(resource) return resource.space end,
     gettime = function(resource, version) return resource.time[version] end,
-    getpatchset = function(resource, version) end,
-    addpatchset = function(resource, patchset) end,
   }}
 
 local M = {
   createspace = function(...) return create_space_dag_node(nil, ...) end,
 }
 
-function M.createresource(version)
+function M.createresource(version, elem)
   if not version then version = "0" end
   return setmetatable({
       -- create root node
-      space = M.createspace(version),
+      space = M.createspace(version, elem),
       time = {},
       futureparents = setmetatable({[version] = true}, metaparents),
       }, metaresource)

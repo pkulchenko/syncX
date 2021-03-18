@@ -5,8 +5,8 @@ local space
 
 -- test get/set methods
 space = sync9.createspace("0", {'X', '1', '2', '3'})
-is(space:getvalue(), "X123", "Initial space created with expected value.")
-is(space:getlength(), 4, "Initial space created with expected length.")
+is(space:getvalue(), "X123", "Space created with expected value.")
+is(space:getlength(), 4, "Space created with expected length.")
 space:set(0, "0")
 is(space:getvalue(), "0123", "Set processed.")
 is(space:get(0), "0", "Get processed (1/2).")
@@ -14,7 +14,7 @@ is(space:get(3), "3", "Get processed (2/2).")
 
 -- test inserts
 space = sync9.createspace("0", {'X', '1'})
-is(space:getvalue(), "X1", "Initial space created.")
+is(space:getvalue(), "X1", "Space created.")
 space:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
 is(space:getvalue(), "XABBA1", "Patchset processed with two patches inserted at different positions.")
 space:addpatchset("30", {{3, 0, {'C', 'C'}}})
@@ -26,7 +26,7 @@ is(space:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additi
 
 -- test deletes
 space = sync9.createspace("0", {'X', '1', '2', '3'})
-is(space:getvalue(), "X123", "Initial space created.")
+is(space:getvalue(), "X123", "Space created.")
 space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 space:addpatchset("30", {{1, 4, {}}})
@@ -42,7 +42,7 @@ local shallowdata = setmetatable({[0] = "X123"}, {__index = {
       getvalue = function(tbl) return tbl[0] end,
     }})
 space = sync9.createspace("0", shallowdata)
-is(space:getvalue(), "X123", "Initial space created with shallow embedded data.")
+is(space:getvalue(), "X123", "Space created with shallow embedded data.")
 space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 space:addpatchset("30", {{1, 4, {}}})
@@ -71,7 +71,7 @@ space:sethandler{
     str = str:sub(1, offset)..str:sub(offset+length+1)
   end,
 }
-is(space:getvalue(), "X123", "Initial space created with shallow embedded data.")
+is(space:getvalue(), "X123", "Space created with shallow embedded data.")
 space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
 is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 space:addpatchset("30", {{1, 4, {}}})
@@ -118,7 +118,7 @@ ok(not p1:equals(p2), "Tables with different content are not equal.")
 resource = sync9.createresource()
 resource:addversion("00", {{0, 0, {'X', '1'}}})
 ok(resource:gettime("00"), "Resource version history is updated.")
-is(resource:getvalue(), "X1", "Initial resource created.")
+is(resource:getvalue(), "X1", "Resource created.")
 resource:addversion("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
 is(resource:getvalue(), "XABBA1", "Resource patchset processed with two patches inserted at different positions.")
 resource:addversion("30", {{3, 0, {'C', 'C'}}})
@@ -132,7 +132,7 @@ ok(resource:gettime("50") and resource:gettime("50")["40"], "Resource version hi
 -- test branching versioning for resources
 resource = sync9.createresource()
 resource:addversion("v00", {{0, 0, {'X', '1'}}})
-is(resource:getvalue(), "X1", "Initial resource created.")
+is(resource:getvalue(), "X1", "Resource created.")
 resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
 is(resource:getvalue(), "XAA1", "Resource patch processed with explicit parent.")
 resource:addversion("v10", {{1, 0, {'B'}}}, {v00 = true})
@@ -148,3 +148,7 @@ is(resource:getvalue("v30"), "XBACA1", "Resource returns value for specific vers
 is(resource:getvalue("v40"), "X1", "Resource returns value for specific version (5/5).")
 ok(resource:gettime("v30") and resource:gettime("v30").v10 and resource:gettime("v30").v20,
   "Resource version history is merged with multiple parent versions.")
+
+-- test direct resource initialization
+resource = sync9.createresource("0", {'A', 'A'})
+is(resource:getvalue(), "AA", "Resource created with initialization value.")

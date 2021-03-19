@@ -103,12 +103,17 @@ local function space_dag_set(node, index, value, is_anc)
 end
 
 local create_space_dag_node, space_dag_add_patchset -- forward declarations
+local function copy(tbl)
+  local res = setmetatable({}, getmetatable(tbl))
+  for k, v in pairs(tbl) do res[k] = v end
+  return res
+end
 local metaparts = {__index = {
     splice = splice,
     slice = function(...) return {table.unpack(...)} end,
     spliceinto = spliceinto, -- insert in the appropriate slot based on binary search by version
     any = any, -- return `true` if any of the values match condition
-    copy = function(tbl) return {table.unpack(tbl)} end,
+    copy = copy,
   }}
 local metaelems = {__index = {
     slice = function(...) return {table.unpack(...)} end,
@@ -283,11 +288,7 @@ space_dag_add_patchset = function(node, nodeversion, patches, isanc)
 end
 
 local metaparents = {__index = {
-    copy = function(tbl)
-      local res = setmetatable({}, getmetatable(tbl))
-      for k, v in pairs(tbl) do res[k] = v end
-      return res
-    end,
+    copy = copy,
     equals = function(tbl1, tbl2)
       if #tbl1 ~= #tbl2 then return false end
       local val1, val2, key1, key2

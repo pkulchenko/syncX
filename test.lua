@@ -146,9 +146,27 @@ is(resource:getvalue("v10"), "XB1", "Resource returns value for specific version
 is(resource:getvalue("v20"), "XAA1", "Resource returns value for specific version (2/5).")
 is(resource:getvalue("v30"), "XBACA1", "Resource returns value for specific version (4/5).")
 is(resource:getvalue("v40"), "X1", "Resource returns value for specific version (5/5).")
-ok(resource:gettime("v30") and resource:gettime("v30").v10 and resource:gettime("v30").v20,
+ok(resource:getparents("v30").v10 and resource:getparents("v30").v20,
   "Resource version history is merged with multiple parent versions.")
 
 -- test direct resource initialization
-resource = sync9.createresource("0", {'A', 'A'})
-is(resource:getvalue(), "AA", "Resource created with initialization value.")
+resource = sync9.createresource("v00", {'X', '1'})
+is(resource:getvalue(), "X1", "Resource created with initialization value.")
+
+-- test branching addition and deletion
+resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
+is(resource:getvalue(), "XAA1", "Resource patch processed with explicit parent insert first (1/4).")
+resource:addversion("v10", {{0, 2}}, {v00 = true})
+is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent insert first (2/4).")
+is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit parent insert first (3/4).")
+is(resource:getvalue(), "AA", "Resource patch processed with explicit parent insert first (4/4).")
+
+-- test branching deletion and addition
+resource = sync9.createresource("v00", {'X', '1'})
+is(resource:getvalue(), "X1", "Resource created with initialization value.")
+resource:addversion("v10", {{0, 2}}, {v00 = true})
+is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (1/4).")
+resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
+is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit parent delete first (2/4).")
+is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (3/4).")
+is(resource:getvalue(), "AA", "Resource patch processed with explicit parent delete first (4/4).")

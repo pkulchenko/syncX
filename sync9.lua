@@ -352,6 +352,9 @@ local metaresource = {__index = {
     sethandler = function(resource, ...) return resource.space:sethandler(...) end,
     getspace = function(resource) return resource.space end,
     gettime = function(resource, version) return resource.time[version] end,
+    getparents = function(resource, version)
+      return version and resource.time[version] or resource.futureparents
+    end
   }}
 
 local M = {

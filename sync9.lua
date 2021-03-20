@@ -309,7 +309,6 @@ local metaresource = {__index = {
       local isanc
       if version then
         local ancestors = resource:getancestors({[version] = true})
-        ancestors[version] = true
         isanc = function(nodeversion) return ancestors[nodeversion] end
       end
       return resource.space:getvalue(isanc)
@@ -344,7 +343,7 @@ local metaresource = {__index = {
         isanc = function() return true end
       else
         local ancestors = resource:getancestors(parents)
-        ancestors[version] = true
+        ancestors[version] = true -- include the version itself
         isanc = function(nodeversion) return ancestors[nodeversion] end
       end
       resource.space:addpatchset(version, patchset, isanc)

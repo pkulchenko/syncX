@@ -149,6 +149,12 @@ is(resource:getvalue("v40"), "X1", "Resource returns value for specific version 
 ok(resource:getparents("v30").v10 and resource:getparents("v30").v20,
   "Resource version history is merged with multiple parent versions.")
 
+-- test ancestor handling
+local ancestors = resource:getancestors({v30 = true})
+ok(ancestors.v10 and ancestors.v20 and ancestors.v30 and ancestors.v00, "Ancestor by version returns all ancestors (1/2).")
+ancestors = resource:getancestors({v10 = true})
+ok(ancestors.v10 and ancestors.v00, "Ancestor by version returns all ancestors (2/2).")
+
 -- test direct resource initialization
 resource = sync9.createresource("v00", {'X', '1'})
 is(resource:getvalue(), "X1", "Resource created with initialization value.")

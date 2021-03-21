@@ -295,7 +295,12 @@ local metaparents = {__index = {
       while true do
         key1, val1 = next(tbl1, key1)
         key2, val2 = next(tbl2, key2)
+        -- check if the both tables ended at the same time
+        -- they are equal and nothing else needs to be done
         if key1 == nil and key2 == nil then break end
+        -- if the keys are not `nil` and are not cross-equal
+        -- then tables are not equal; this check is needed,
+        -- as "equal" tables can return keys in different order
         if key1 ~= nil and tbl2[key1] ~= val1
         or key2 ~= nil and tbl1[key2] ~= val2 then
           return false

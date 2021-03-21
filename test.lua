@@ -169,6 +169,10 @@ is(resource:getvalue(), "AA", "Resource patch processed with explicit parent ins
 
 -- test branching deletion and addition
 resource = sync9.createresource("v00", {'X', '1'})
+local callbacks = {}
+resource:sethandler{
+  version = function(node, version) table.insert(callbacks, version) end,
+}
 is(resource:getvalue(), "X1", "Resource created with initialization value.")
 resource:addversion("v10", {{0, 2}}, {v00 = true})
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (1/4).")
@@ -180,3 +184,6 @@ is(resource:getvalue(), "AA", "Resource patch processed with explicit parent del
 is(resource:getpatchset("v00"), {{0, 0, {"X"}}, {1, 0, {"1"}}}, "Resource patchset for a version has expected patches (1/3).")
 is(resource:getpatchset("v10"), {{0, 1}, {0, 1}}, "Resource patchset for a version has expected patches (2/3).")
 is(resource:getpatchset("v20"), {{1, 0, {"AA"}}}, "Resource patchset for a version has expected number of patches (3/3).")
+
+is(callbacks[1], "v10", "Resource callback reports expected version (1/2).")
+is(callbacks[2], "v20", "Resource callback reports expected version (2/2).")

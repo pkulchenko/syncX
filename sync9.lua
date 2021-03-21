@@ -154,6 +154,7 @@ local function getmetanode()
       end,
       oninsert = function() end,
       ondelete = function() end,
+      onversion = function() end,
       get = space_dag_get,
       set = space_dag_set,
     }}
@@ -285,6 +286,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
   end
   traverse_space_dag(node, isanc, process_patch)
   patchset:next() -- process any outstanding deferred actions
+  node:onversion(nodeversion)
 end
 
 local metaparents = {__index = {

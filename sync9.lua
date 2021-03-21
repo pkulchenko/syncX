@@ -358,7 +358,22 @@ local metaresource = {__index = {
     gettime = function(resource, version) return resource.time[version] end,
     getparents = function(resource, version)
       return version and resource.time[version] or resource.futureparents
-    end
+    end,
+    -- generates patchset for a particular version
+    getpatchset = function(resource, version)
+      local ancestors = resource:getancestors({[version] = true})
+      local isanc = function(nodeversion) return ancestors[nodeversion] end
+      local patchset = {}
+      local function process_patch(node, nodeversion, _, offset)
+        if version == nodeversion then
+          table.insert(patchset, {offset, 0, {node.elems:getvalue()}})
+        elseif node.deletedby[version] and node.elems:getlength() > 0 then
+          table.insert(patchset, {offset, node.elems:getlength()})
+        end
+      end
+      traverse_space_dag(resource:getspace(), isanc, process_patch)
+      return patchset
+    end,
   }}
 
 local M = {

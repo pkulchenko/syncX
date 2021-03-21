@@ -176,3 +176,7 @@ resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
 is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit parent delete first (2/4).")
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (3/4).")
 is(resource:getvalue(), "AA", "Resource patch processed with explicit parent delete first (4/4).")
+
+is(resource:getpatchset("v00"), {{0, 0, {"X"}}, {1, 0, {"1"}}}, "Resource patchset for a version has expected patches (1/3).")
+is(resource:getpatchset("v10"), {{0, 1}, {0, 1}}, "Resource patchset for a version has expected patches (2/3).")
+is(resource:getpatchset("v20"), {{1, 0, {"AA"}}}, "Resource patchset for a version has expected number of patches (3/3).")

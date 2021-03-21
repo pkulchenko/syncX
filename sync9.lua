@@ -362,8 +362,8 @@ local metaresource = {__index = {
       return version and resource.time[version] or resource.futureparents
     end,
     -- generates patchset for a particular version
-    getpatchset = function(resource, version)
-      local ancestors = resource:getancestors({[version] = true})
+    getpatchset = function(resource, version, versions)
+      local ancestors = resource:getancestors(versions or resource.futureparents)
       local isanc = function(nodeversion) return ancestors[nodeversion] end
       local patchset = {}
       local function process_patch(node, nodeversion, _, offset)

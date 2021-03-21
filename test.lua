@@ -181,9 +181,19 @@ is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit par
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (3/4).")
 is(resource:getvalue(), "AA", "Resource patch processed with explicit parent delete first (4/4).")
 
-is(resource:getpatchset("v00"), {{0, 0, {"X"}}, {1, 0, {"1"}}}, "Resource patchset for a version has expected patches (1/3).")
-is(resource:getpatchset("v10"), {{0, 1}, {0, 1}}, "Resource patchset for a version has expected patches (2/3).")
-is(resource:getpatchset("v20"), {{1, 0, {"AA"}}}, "Resource patchset for a version has expected number of patches (3/3).")
+-- test patchsets generated "as of" their own version (should be the same as the original patchset)
+is(resource:getpatchset("v00", {v00 = true}), {{0, 0, {"X"}}, {1, 0, {"1"}}},
+  "Resource patchset for its own version has expected patches (1/3).")
+is(resource:getpatchset("v10", {v10 = true}), {{0, 1}, {0, 1}},
+  "Resource patchset for its own version has expected patches (2/3).")
+is(resource:getpatchset("v20", {v20 = true}), {{1, 0, {"AA"}}},
+  "Resource patchset for its own version has expected number of patches (3/3).")
 
 is(callbacks[1], "v10", "Resource callback reports expected version (1/2).")
 is(callbacks[2], "v20", "Resource callback reports expected version (2/2).")
+
+-- test patchsets generated "as of" the current version ("rebase" the patchset)
+is(resource:getpatchset("v00"), {{0, 0, {"X"}}, {2, 0, {"1"}}},
+  "Resource patchset for the current version has expected patches (1/3).")
+is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the current version has expected patches (2/3).")
+is(resource:getpatchset("v20"), {{0, 0, {"AA"}}}, "Resource patchset for the current version has expected number of patches (3/3).")

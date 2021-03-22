@@ -163,6 +163,10 @@ end
 create_space_dag_node = function(node, version, elems, deletedby)
   assert(not elems or type(elems) == "table")
   assert(not deletedby or type(deletedby) == "table")
+  -- deletion calculations fail on elements with empty strings, so strip those
+  for idx = elems and #elems or 0, 1, -1 do
+    if #elems[idx] == 0 then table.remove(elems, idx) end
+  end
   return setmetatable({
       version = version, -- node version as a string
       -- list of elements this node stores; keep its metatable if one is provided

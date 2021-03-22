@@ -35,6 +35,8 @@ space:addpatchset("32", {{1, 1, {''}}})
 is(space:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 space:addpatchset("40", {{0, 2, {'C', 'C'}}})
 is(space:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+space:addpatchset("50", {{1, 1, {'D'}}})
+is(space:getvalue(), "CD", "Patch processed with 1 element deleted and added at the last element.")
 
 -- test embedded shallow processing
 -- the content is managed as a string instead of a table

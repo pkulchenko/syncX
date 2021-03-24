@@ -119,6 +119,7 @@ local metaelems = {__index = {
     slice = function(...) return {table.unpack(...)} end,
     getlength = function(tbl) return #tbl end,
     getvalue = function(tbl) return table.concat(tbl, "") end,
+    copy = copy,
   }}
 local function getmetanode()
   -- return metatable from a function to control which nodes share metatables
@@ -372,7 +373,7 @@ local metaresource = {__index = {
       local patchset = {}
       local function process_patch(node, nodeversion, _, offset)
         if version == nodeversion then
-          table.insert(patchset, {offset, 0, {node.elems:getvalue()}})
+          table.insert(patchset, {offset, 0, node.elems:copy()})
         elseif node.deletedby[version] and node.elems:getlength() > 0 then
           table.insert(patchset, {offset, node.elems:getlength()})
         end

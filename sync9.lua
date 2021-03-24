@@ -374,7 +374,9 @@ local metaresource = {__index = {
       local function process_patch(node, nodeversion, _, offset)
         if version == nodeversion then
           table.insert(patchset, {offset, 0, node.elems:copy()})
-        elseif node.deletedby[version] and node.elems:getlength() > 0 then
+        elseif node.deletedby[version] and node.elems:getlength() > 0
+          -- skip if this entry is deleted by another ancestor patch
+          and not node.deletedby:any(function(v) return v ~= version and isanc(v) end) then
           table.insert(patchset, {offset, node.elems:getlength()})
         end
       end

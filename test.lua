@@ -201,3 +201,17 @@ is(resource:getpatchset("v00"), {{0, 0, {'X'}}, {2, 0, {'1'}}},
   "Resource patchset for the current version has expected number of patches (1/3).")
 is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the current version has expected number of patches (2/3).")
 is(resource:getpatchset("v20"), {{0, 0, {'A', 'A'}}}, "Resource patchset for the current version has expected number of patches (3/3).")
+
+-- test branching replacement and overlapping deletion
+resource = sync9.createresource("v00", {'X', '1', '2', '3', '4', '5', '6','7'})
+
+resource:addversion("v10", {{2, 2, {'A'}}}, {v00 = true})
+is(resource:getvalue("v10"), "X1A4567", "Resource patch processed with overlapping deletes (1/4).")
+resource:addversion("v20", {{1, 6}}, {v00 = true})
+is(resource:getvalue("v20"), "X7", "Resource patch processed with overlapping deletes (2/4).")
+is(resource:getvalue("v10"), "X1A4567", "Resource patch processed with overlapping deletes (3/4).")
+is(resource:getvalue(), "XA7", "Resource patch processed with overlapping deletes (4/4).")
+
+-- test patchsets generated "as of" the current version ("rebase" the patchset)
+is(resource:getpatchset("v10"), {{1, 0, {'A'}}}, "Resource patchset for the current version has expected patches (1/2).")
+is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the current version has expected patches (2/2).")

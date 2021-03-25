@@ -323,82 +323,82 @@ function M.createresource(version, elem)
   if not version then version = "0" end
 
   local metaresource = {__index = {
-    getvalue = function(resource, version)
-      local isanc
-      if version then
-        local ancestors = resource:getancestors({[version] = true})
-        isanc = function(nodeversion) return ancestors[nodeversion] end
-      end
-      return resource.space:getvalue(isanc)
-    end,
-    getancestors = function(resource, versions)
-      local results = {}
-      local function helper(version)
-        if results[version] then return end
-        if not resource.time[version] then return end -- ignore non-existent versions
-        results[version] = true
-        for ver in pairs(resource.time[version]) do helper(ver) end
-      end
-      for ver in pairs(versions) do helper(ver) end
-      return results
-    end,
-    addversion = function(resource, version, patchset, parents)
-      assert(#patchset > 0)
-      -- this version is already known
-      if resource.time[version] then return end
+      getvalue = function(resource, version)
+        local isanc
+        if version then
+          local ancestors = resource:getancestors({[version] = true})
+          isanc = function(nodeversion) return ancestors[nodeversion] end
+        end
+        return resource.space:getvalue(isanc)
+      end,
+      getancestors = function(resource, versions)
+        local results = {}
+        local function helper(version)
+          if results[version] then return end
+          if not resource.time[version] then return end -- ignore non-existent versions
+          results[version] = true
+          for ver in pairs(resource.time[version]) do helper(ver) end
+        end
+        for ver in pairs(versions) do helper(ver) end
+        return results
+      end,
+      addversion = function(resource, version, patchset, parents)
+        assert(#patchset > 0)
+        -- this version is already known
+        if resource.time[version] then return end
 
-      -- take the current version (future parents) if none are specified
-      if not parents then parents = resource.futureparents:copy() end
-      resource.time[version] = parents
+        -- take the current version (future parents) if none are specified
+        if not parents then parents = resource.futureparents:copy() end
+        resource.time[version] = parents
 
-      -- delete current parents from future ones
-      for parent in pairs(parents) do resource.futureparents[parent] = nil end
-      resource.futureparents[version] = true
+        -- delete current parents from future ones
+        for parent in pairs(parents) do resource.futureparents[parent] = nil end
+        resource.futureparents[version] = true
 
-      local isanc
-      -- shortcut with a simplified version for a frequently used case
-      if resource.futureparents:equals(parents) then
-        isanc = function() return true end
-      else
-        local ancestors = resource:getancestors(parents)
-        ancestors[version] = true -- include the version itself
-        isanc = function(nodeversion) return ancestors[nodeversion] end
-      end
-      resource.space:addpatchset(version, patchset, isanc)
-      resource:onversion(version)
-    end,
-    sethandler = function(resource, ...) return resource.space:sethandler(...) end,
-    getspace = function(resource) return resource.space end,
-    gettime = function(resource, version) return resource.time[version] end,
-    getparents = function(resource, version)
-      return version and resource.time[version] or resource.futureparents
-    end,
-    -- generates patchset for a particular version
-    getpatchset = function(resource, version, versions)
-      local ancestors = resource:getancestors(versions or resource.futureparents)
-      local isanc = function(nodeversion) return ancestors[nodeversion] end
-      local patchset = {}
-      local function process_patch(node, nodeversion, _, offset)
-        if version == nodeversion then
-          table.insert(patchset, {offset, 0, node.elems:copy()})
-        elseif node.deletedby[version] and node.elems:getlength() > 0
+        local isanc
+        -- shortcut with a simplified version for a frequently used case
+        if resource.futureparents:equals(parents) then
+          isanc = function() return true end
+        else
+          local ancestors = resource:getancestors(parents)
+          ancestors[version] = true -- include the version itself
+          isanc = function(nodeversion) return ancestors[nodeversion] end
+        end
+        resource.space:addpatchset(version, patchset, isanc)
+        resource:onversion(version)
+      end,
+      sethandler = function(resource, ...) return resource.space:sethandler(...) end,
+      getspace = function(resource) return resource.space end,
+      gettime = function(resource, version) return resource.time[version] end,
+      getparents = function(resource, version)
+        return version and resource.time[version] or resource.futureparents
+      end,
+      -- generates patchset for a particular version
+      getpatchset = function(resource, version, versions)
+        local ancestors = resource:getancestors(versions or resource.futureparents)
+        local isanc = function(nodeversion) return ancestors[nodeversion] end
+        local patchset = {}
+        local function process_patch(node, nodeversion, _, offset)
+          if version == nodeversion then
+            table.insert(patchset, {offset, 0, node.elems:copy()})
+          elseif node.deletedby[version] and node.elems:getlength() > 0
           -- skip if this entry is deleted by another ancestor patch
           and not node.deletedby:any(function(v) return v ~= version and isanc(v) end) then
-          table.insert(patchset, {offset, node.elems:getlength()})
+            table.insert(patchset, {offset, node.elems:getlength()})
+          end
         end
-      end
-      traverse_space_dag(resource:getspace(), isanc, process_patch)
-      return patchset
-    end,
-    sethandler = function(node, handlers)
-      local mt = getmetatable(node)
-      if not mt or not mt.__index then return end
-      for k, v in pairs(handlers) do
-        getmetatable(node).__index["on"..k] = v
-      end
-    end,
-    onversion = function() end,
-  }}
+        traverse_space_dag(resource:getspace(), isanc, process_patch)
+        return patchset
+      end,
+      sethandler = function(node, handlers)
+        local mt = getmetatable(node)
+        if not mt or not mt.__index then return end
+        for k, v in pairs(handlers) do
+          getmetatable(node).__index["on"..k] = v
+        end
+      end,
+      onversion = function() end,
+    }}
 
   return setmetatable({
       -- create root node

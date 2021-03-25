@@ -139,22 +139,6 @@ local function getmetanode()
           end)
         return table.concat(values)
       end,
-      sethandler = function(node, handlers)
-        local mt = getmetatable(node)
-        if not mt or not mt.__index then return end
-        for k, v in pairs(handlers) do
-          getmetatable(node).__index["on"..k] = v
-        end
-      end,
-      insert = function(node, nodeversion, val, idx)
-        node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
-        if #val > 0 then node.oninsert(nodeversion, idx, val) end
-      end,
-      delete = function(node, nodeversion, length, idx)
-        node.ondelete(nodeversion, idx, length)
-      end,
-      oninsert = function() end,
-      ondelete = function() end,
       get = space_dag_get,
       set = space_dag_set,
     }}
@@ -226,7 +210,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       if delcnt == 0 and addidx == offset then
         if nodelength == 0 and hasparts then return end
         if nodelength > 0 then space_dag_break_node(node, 0) end
-        node:insert(nodeversion, val, addidx)
+        node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
         patchset:next()
       end
       return
@@ -239,7 +223,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset) end
-      node:insert(nodeversion, val, addidx)
+      node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
       patchset:next()
       return
     end
@@ -252,12 +236,16 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       if val then
         if addidx == offset and prev then
           -- defer updates, otherwise inserted nodes affect position tracking
-          patchset:defer(function() node:insert(nodeversion, val, addidx) end)
+          patchset:defer(function()
+              node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+            end)
           -- fall through to the next check for `deleteupto`
         else
           space_dag_break_node(node, addidx - offset)
           -- defer updates, otherwise inserted nodes affect position tracking
-          patchset:defer(function() node:insert(nodeversion, val, addidx) end)
+          patchset:defer(function()
+              node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+            end)
           return
         end
       else
@@ -277,12 +265,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
           -- increase the number of deleted elements subtracting the number of added ones
           deletedcnt = deletedcnt + deleteupto - offset - #(val or {})
         end
-        -- defer delete processing, as it needs to be processed in the opposite order
-        patchset:defer(function() node:delete(nodeversion, node.elems:getlength(), offset) end, true)
         patchset:next()
-      else
-        -- defer delete processing, as it needs to be processed in the opposite order
-        patchset:defer(function() node:delete(nodeversion, node.elems:getlength(), offset) end, true)
       end
       node.deletedby[nodeversion] = true
       return

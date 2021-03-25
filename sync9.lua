@@ -155,7 +155,6 @@ local function getmetanode()
       end,
       oninsert = function() end,
       ondelete = function() end,
-      onversion = function() end,
       get = space_dag_get,
       set = space_dag_set,
     }}
@@ -291,7 +290,6 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
   end
   traverse_space_dag(node, isanc, process_patch)
   patchset:next() -- process any outstanding deferred actions
-  node:onversion(nodeversion)
 end
 
 local metaparents = {__index = {
@@ -316,7 +314,15 @@ local metaparents = {__index = {
       return true
     end,
   }}
-local metaresource = {__index = {
+
+local M = {
+  createspace = function(...) return create_space_dag_node(nil, ...) end,
+}
+
+function M.createresource(version, elem)
+  if not version then version = "0" end
+
+  local metaresource = {__index = {
     getvalue = function(resource, version)
       local isanc
       if version then
@@ -359,6 +365,7 @@ local metaresource = {__index = {
         isanc = function(nodeversion) return ancestors[nodeversion] end
       end
       resource.space:addpatchset(version, patchset, isanc)
+      resource:onversion(version)
     end,
     sethandler = function(resource, ...) return resource.space:sethandler(...) end,
     getspace = function(resource) return resource.space end,
@@ -383,14 +390,16 @@ local metaresource = {__index = {
       traverse_space_dag(resource:getspace(), isanc, process_patch)
       return patchset
     end,
+    sethandler = function(node, handlers)
+      local mt = getmetatable(node)
+      if not mt or not mt.__index then return end
+      for k, v in pairs(handlers) do
+        getmetatable(node).__index["on"..k] = v
+      end
+    end,
+    onversion = function() end,
   }}
 
-local M = {
-  createspace = function(...) return create_space_dag_node(nil, ...) end,
-}
-
-function M.createresource(version, elem)
-  if not version then version = "0" end
   return setmetatable({
       -- create root node
       space = M.createspace(version, elem),

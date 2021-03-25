@@ -87,21 +87,21 @@ is(str, space:getvalue(), "Direct comparison of external shallow data.")
 
 -- test handler independence
 local updated
-local space1 = sync9.createspace("0", {'A'})
-space1:sethandler{
-  insert = function(version)
+local resource1 = sync9.createresource("0", {'A'})
+resource1:sethandler{
+  version = function(_, version)
     updated = "Updated 1 with version "..version
   end,
 }
-local space2 = sync9.createspace("0", {'A'})
-space2:sethandler{
-  insert = function(version)
+local resource2 = sync9.createresource("0", {'A'})
+resource2:sethandler{
+  version = function(_, version)
     updated = "Updated 2 with version "..version
   end,
 }
-space1:addpatchset("10", {{1, 0, {'B'}}})
+resource1:addversion("10", {{1, 0, {'B'}}})
 is(updated, "Updated 1 with version 10", "Different root nodes have different handlers (1/2).")
-space2:addpatchset("20", {{1, 0, {'B'}}})
+resource2:addversion("20", {{1, 0, {'B'}}})
 is(updated, "Updated 2 with version 20", "Different root nodes have different handlers (2/2).")
 
 -- test parent comparisons

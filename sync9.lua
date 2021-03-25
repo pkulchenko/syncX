@@ -121,9 +121,16 @@ local metaelems = {__index = {
     getvalue = function(tbl) return table.concat(tbl, "") end,
     copy = copy,
   }}
-local function getmetanode()
-  -- return metatable from a function to control which nodes share metatables
-  return {__index = {
+
+create_space_dag_node = function(node, version, elems, deletedby)
+  assert(not elems or type(elems) == "table")
+  assert(not deletedby or type(deletedby) == "table")
+  -- deletion calculations fail on elements with empty strings, so strip those
+  for idx = elems and #elems or 0, 1, -1 do
+    if #elems[idx] == 0 then table.remove(elems, idx) end
+  end
+
+  local metanode = {__index = {
       addpatchset = space_dag_add_patchset,
       getlength = function(node, isanc)
         isanc = isanc or function() return true end
@@ -142,15 +149,7 @@ local function getmetanode()
       get = space_dag_get,
       set = space_dag_set,
     }}
-end
 
-create_space_dag_node = function(node, version, elems, deletedby)
-  assert(not elems or type(elems) == "table")
-  assert(not deletedby or type(deletedby) == "table")
-  -- deletion calculations fail on elements with empty strings, so strip those
-  for idx = elems and #elems or 0, 1, -1 do
-    if #elems[idx] == 0 then table.remove(elems, idx) end
-  end
   return setmetatable({
       version = version, -- node version as a string
       -- list of elements this node stores; keep its metatable if one is provided
@@ -158,7 +157,7 @@ create_space_dag_node = function(node, version, elems, deletedby)
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
       -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
-      }, node and getmetatable(node) or getmetanode())
+      }, metanode)
 end
 
 local function space_dag_break_node(node, splitidx, newpart)

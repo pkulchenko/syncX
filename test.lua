@@ -1,42 +1,42 @@
 require "testwell"
 
 local sync9 = require "sync9"
-local space
+local resource
 
 -- test get/set methods
-space = sync9.createspace("0", {'X', '1', '2', '3'})
-is(space:getvalue(), "X123", "Space created with expected value.")
-is(space:getlength(), 4, "Space created with expected length.")
-space:set(0, "0")
-is(space:getvalue(), "0123", "Set processed.")
-is(space:get(0), "0", "Get processed (1/2).")
-is(space:get(3), "3", "Get processed (2/2).")
+resource = sync9.createspace("0", {'X', '1', '2', '3'})
+is(resource:getvalue(), "X123", "Space created with expected value.")
+is(resource:getlength(), 4, "Space created with expected length.")
+resource:set(0, "0")
+is(resource:getvalue(), "0123", "Set processed.")
+is(resource:get(0), "0", "Get processed (1/2).")
+is(resource:get(3), "3", "Get processed (2/2).")
 
 -- test inserts
-space = sync9.createspace("0", {'X', '1'})
-is(space:getvalue(), "X1", "Space created.")
-space:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
-is(space:getvalue(), "XABBA1", "Patchset processed with two patches inserted at different positions.")
-space:addpatchset("30", {{3, 0, {'C', 'C'}}})
-is(space:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
-space:addpatchset("40", {{4, 0, {'D'}}})
-is(space:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
-space:addpatchset("50", {{1, 0, {}}})
-is(space:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
+resource = sync9.createspace("0", {'X', '1'})
+is(resource:getvalue(), "X1", "Space created.")
+resource:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
+is(resource:getvalue(), "XABBA1", "Patchset processed with two patches inserted at different positions.")
+resource:addpatchset("30", {{3, 0, {'C', 'C'}}})
+is(resource:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
+resource:addpatchset("40", {{4, 0, {'D'}}})
+is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
+resource:addpatchset("50", {{1, 0, {}}})
+is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
 
 -- test deletes
-space = sync9.createspace("0", {'X', '1', '2', '3'})
-is(space:getvalue(), "X123", "Space created.")
-space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
-is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
-space:addpatchset("30", {{1, 1}})
-space:addpatchset("31", {{1, 2, {}}})
-space:addpatchset("32", {{1, 1, {''}}})
-is(space:getvalue(), "X3", "Patch processed with 4 elements deleted.")
-space:addpatchset("40", {{0, 2, {'C', 'C'}}})
-is(space:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
-space:addpatchset("50", {{1, 1, {'D'}}})
-is(space:getvalue(), "CD", "Patch processed with 1 element deleted and added at the last element.")
+resource = sync9.createspace("0", {'X', '1', '2', '3'})
+is(resource:getvalue(), "X123", "Space created.")
+resource:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+resource:addpatchset("30", {{1, 1}})
+resource:addpatchset("31", {{1, 2, {}}})
+resource:addpatchset("32", {{1, 1, {''}}})
+is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+resource:addpatchset("40", {{0, 2, {'C', 'C'}}})
+is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+resource:addpatchset("50", {{1, 1, {'D'}}})
+is(resource:getvalue(), "CD", "Patch processed with 1 element deleted and added at the last element.")
 
 -- test embedded shallow processing
 -- the content is managed as a string instead of a table
@@ -45,14 +45,14 @@ local shallowdata = setmetatable({[0] = "X123"}, {__index = {
       getlength = function(tbl) return #tbl[0] end,
       getvalue = function(tbl) return tbl[0] end,
     }})
-space = sync9.createspace("0", shallowdata)
-is(space:getvalue(), "X123", "Space created with shallow embedded data.")
-space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
-is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
-space:addpatchset("30", {{1, 4, {}}})
-is(space:getvalue(), "X3", "Patch processed with 4 elements deleted.")
-space:addpatchset("40", {{0, 2, {'C', 'C'}}})
-is(space:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+resource = sync9.createspace("0", shallowdata)
+is(resource:getvalue(), "X123", "Space created with shallow embedded data.")
+resource:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+resource:addpatchset("30", {{1, 4, {}}})
+is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+resource:addpatchset("40", {{0, 2, {'C', 'C'}}})
+is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 
 -- test external shallow processing
 -- the content is managed as a string external to the graph
@@ -62,28 +62,33 @@ shallowdata = setmetatable({n = #str}, {__index = {
       getlength = function(tbl) return tbl.n end,
       getvalue = function(tbl, offset) return str:sub(offset + 1, offset + tbl.n) end,
     }})
-space = sync9.createspace("0", shallowdata)
--- set insert/delete handlers that are called when modifications are made
+resource = sync9.createresource("0", shallowdata)
+-- set version handler that is called when modifications are made
 local callbacks = {}
-space:sethandler{
-  insert = function(version, offset, value)
-    table.insert(callbacks, {"ins", version, offset, value})
-    str = str:sub(1, offset)..table.concat(value,"")..str:sub(offset+1)
-  end,
-  delete = function(version, offset, length)
-    table.insert(callbacks, {"del", version, offset, length})
-    str = str:sub(1, offset)..str:sub(offset+length+1)
+resource:sethandler{
+  version = function(resource, version)
+    for _, patch in ipairs(resource:getpatchset(version, {[version] = true})) do
+      local addidx, delcnt, value = (table.unpack or unpack)(patch)
+      if delcnt > 0 then
+        table.insert(callbacks, {"del", version, addidx, delcnt})
+        str = str:sub(1, addidx)..str:sub(addidx+delcnt+1)
+      end
+      if value and #value > 0 then
+        table.insert(callbacks, {"ins", version, addidx, value})
+        str = str:sub(1, addidx)..table.concat(value,"")..str:sub(addidx+1)
+      end
+    end
   end,
 }
-is(space:getvalue(), "X123", "Space created with shallow embedded data.")
-space:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
-is(space:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
-space:addpatchset("30", {{1, 4, {}}})
-is(space:getvalue(), "X3", "Patch processed with 4 elements deleted.")
-is(callbacks[#callbacks][1], "del", "Patch with delete doesn't trigger insert callback.")
-space:addpatchset("40", {{0, 2, {'C', 'C'}}})
-is(space:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
-is(str, space:getvalue(), "Direct comparison of external shallow data.")
+is(resource:getvalue(), "X123", "Space created with shallow embedded data.")
+resource:addversion("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+resource:addversion("30", {{1, 4, {}}})
+is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+is(callbacks[#callbacks] and callbacks[#callbacks][1], "del", "Patch with delete doesn't trigger insert callback.")
+resource:addversion("40", {{0, 2, {'C', 'C'}}})
+is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+is(str, resource:getvalue(), "Direct comparison of external shallow data.")
 
 -- test handler independence
 local updated

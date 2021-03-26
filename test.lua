@@ -220,3 +220,18 @@ is(resource:getvalue(), "XA7", "Resource patch processed with overlapping delete
 -- test patchsets generated "as of" the current version ("rebase" the patchset)
 is(resource:getpatchset("v10"), {{1, 0, {'A'}}}, "Resource patchset for the current version has expected patches (1/2).")
 is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the current version has expected patches (2/2).")
+
+-- test linear versioning for string-based resources
+resource = sync9.createresource("v00", "")
+resource:addversion("v10", {{0, 0, 'X1'}})
+is(resource:getvalue(), "X1", "Resource created.")
+is(resource:getpatchset("v10", {v10 = true}), {{0, 0, 'X1'}},
+  "Resource patchset for its own version has expected patches.")
+resource:addversion("v20", {{1, 0, 'AA'}, {2, 0, 'BB'}})
+is(resource:getvalue(), "XABBA1", "Resource patchset processed with two patches inserted at different positions.")
+resource:addversion("v30", {{3, 0, 'CC'}})
+is(resource:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
+resource:addversion("v40", {{4, 0, 'D'}})
+is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
+resource:addversion("v50", {{1, 0, ""}})
+is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")

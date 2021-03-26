@@ -115,19 +115,30 @@ local metaparts = {__index = {
     any = any, -- return `true` if any of the values match condition
     copy = copy,
   }}
-local metaelems = {__index = {
+-- metatable to handle elements as a table
+local metatblelems = {__index = {
     slice = function(...) return {table.unpack(...)} end,
     getlength = function(tbl) return #tbl end,
     getvalue = function(tbl) return table.concat(tbl, "") end,
     copy = copy,
   }}
+-- metatable to handle elements as a string
+local metastrelems = {__index = {
+    slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
+    getlength = function(tbl) return #tbl[0] end,
+    getvalue = function(tbl) return tbl[0] end,
+    copy = function(tbl) return tbl[0] end,
+  }}
 
 create_space_dag_node = function(node, version, elems, deletedby)
-  assert(not elems or type(elems) == "table")
+  assert(not elems or type(elems) == "table" or type(elems) == "string", "Unexpected elements type (not 'string' or 'table')")
   assert(not deletedby or type(deletedby) == "table")
-  -- deletion calculations fail on elements with empty strings, so strip those
-  for idx = elems and #elems or 0, 1, -1 do
-    if #elems[idx] == 0 then table.remove(elems, idx) end
+
+  -- deletion calculations fail on table elements with empty strings, so strip those
+  if type(elems) == "table" then
+    for idx = elems and #elems or 0, 1, -1 do
+      if #elems[idx] == 0 then table.remove(elems, idx) end
+    end
   end
 
   local metanode = {__index = {
@@ -152,11 +163,12 @@ create_space_dag_node = function(node, version, elems, deletedby)
 
   return setmetatable({
       version = version, -- node version as a string
-      -- list of elements this node stores; keep its metatable if one is provided
-      elems = getmetatable(elems) and elems or setmetatable(elems or {}, metaelems),
+      -- list of elements this node stores; keep its metatable if one is proved
+      elems = (type(elems) == "string" and setmetatable({[0] = elems}, metastrelems)
+        or getmetatable(elems) and elems
+        or setmetatable(elems or {}, metatblelems)),
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
-      -- parts[0] is a special non-versioned node that has been spliced from the elements of the curent node
       }, metanode)
 end
 

@@ -110,7 +110,7 @@ resource2:addversion("20", {{1, 0, {'B'}}})
 is(updated, "Updated 2 with version 20", "Different root nodes have different handlers (2/2).")
 
 -- test parent comparisons
-local resource = sync9.createresource()
+resource = sync9.createresource()
 local p1 = resource.futureparents:copy()
 local p2 = resource.futureparents:copy()
 ok(p1:equals(p2), "Empty tables are equal.")
@@ -192,20 +192,20 @@ is(resource:getvalue(), "AA", "Resource patch processed with explicit parent del
 
 -- test patchsets generated "as of" their own version (should be the same as the original patchset)
 is(resource:getpatchset("v00", {v00 = true}), {{0, 0, {'X'}}, {1, 0, {'1'}}},
-  "Resource patchset for its own version has expected number of patches (1/3).")
+  "Resource patchset for its own version has expected patches (1/3).")
 is(resource:getpatchset("v10", {v10 = true}), {{0, 1}, {0, 1}},
-  "Resource patchset for its own version has expected number of patches (2/3).")
+  "Resource patchset for its own version has expected patches (2/3).")
 is(resource:getpatchset("v20", {v20 = true}), {{1, 0, {'A', 'A'}}},
-  "Resource patchset for its own version has expected number of patches (3/3).")
+  "Resource patchset for its own version has expected patches (3/3).")
 
 is(callbacks[1], "v10", "Resource callback reports expected version (1/2).")
 is(callbacks[2], "v20", "Resource callback reports expected version (2/2).")
 
 -- test patchsets generated "as of" the current version ("rebase" the patchset)
 is(resource:getpatchset("v00"), {{0, 0, {'X'}}, {2, 0, {'1'}}},
-  "Resource patchset for the current version has expected number of patches (1/3).")
-is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the current version has expected number of patches (2/3).")
-is(resource:getpatchset("v20"), {{0, 0, {'A', 'A'}}}, "Resource patchset for the current version has expected number of patches (3/3).")
+  "Resource patchset for the current version has expected patches (1/3).")
+is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the current version has expected patches (2/3).")
+is(resource:getpatchset("v20"), {{0, 0, {'A', 'A'}}}, "Resource patchset for the current version has expected patches (3/3).")
 
 -- test branching replacement and overlapping deletion
 resource = sync9.createresource("v00", {'X', '1', '2', '3', '4', '5', '6','7'})

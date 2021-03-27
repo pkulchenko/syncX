@@ -1,6 +1,6 @@
 require "wx"
 local frame = wx.wxFrame(wx.NULL, wx.wxID_ANY, "syncX demo",
-  wx.wxDefaultPosition, wx.wxSize(1000, 800), wx.wxDEFAULT_FRAME_STYLE)
+  wx.wxDefaultPosition, wx.wxSize(1020, 800), wx.wxDEFAULT_FRAME_STYLE)
 local autosync = {on = "Autosync: ON", off = "Autosync: OFF"}
 local statusbar = frame:CreateStatusBar(1)
 statusbar:SetStatusStyles({wx.wxSB_FLAT})

@@ -81,8 +81,8 @@ local function setsync(editor)
         getvalue = function(tbl, offset) return editor:GetTextRange(offset, offset + tbl.n) end,
       }})
   local resource = sync9.createresource(getnewversion(editor), data)
-  resource:sethandler{
-    version = function(_, version)
+  resource:sethandler {
+    version = function(resource, version)
       local origin = tonumber(version:match("_(.+)"), 16)
       if editor:GetId() ~= origin then -- remote update, apply the changes
         for _, patch in ipairs(resource:getpatchset(version)) do
@@ -90,10 +90,9 @@ local function setsync(editor)
           -- disable event handling, so that external updates don't trigger sync processing
           editor:SetEvtHandlerEnabled(false)
           if value and #value > 0 then
-            local text = table.concat(value, "")
-            editor:InsertText(addidx, text)
+            editor:InsertText(addidx, value)
             editor:SetIndicatorCurrent(editor.indicator)
-            editor:IndicatorFillRange(addidx, #text)
+            editor:IndicatorFillRange(addidx, #value)
           end
           if delcnt > 0 then
             editor:DeleteRange(addidx, delcnt)
@@ -134,11 +133,11 @@ local function editormodified(event)
   end
 
   -- don't need to specify the parents, as all "future parents" will be used by default joining them together
-  editor.sync:addversion(version, {{pos, inserted and 0 or length, inserted and {text} or {}}})
+  editor.sync:addversion(version, {{pos, inserted and 0 or length, inserted and text or {}}})
 
   local parents = {}
   for version in pairs(editor.sync:getparents(version)) do table.insert(parents, version .. " = true") end
-  writelog(editor.log, ("%s, {%s,%s,{%q}}, {%s}"):format(version, pos, inserted and 0 or length,
+  writelog(editor.log, ("%s, {%s,%s,%q}, {%s}"):format(version, pos, inserted and 0 or length,
       inserted and text or '', table.concat(parents, ", "))
     :gsub(',{""}', ""):gsub("\010","n"):gsub("\026","\\026").."\n")
 end

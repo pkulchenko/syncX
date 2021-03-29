@@ -17,7 +17,15 @@ local id = 100
 local function getid() id = id + 1 return id end
 local function createPane(name)
   local ed = wxstc.wxStyledTextCtrl(frame, getid(), wx.wxDefaultPosition, wx.wxSize(500, 400), wx.wxBORDER_NONE)
-  local font = wx.wxFont(14, wx.wxFONTFAMILY_MODERN, wx.wxFONTSTYLE_NORMAL, wx.wxFONTWEIGHT_NORMAL, false, "Courier New")
+  local fontsize = 14
+  if name:find("log") then -- log-specific logic
+    ed:SetReadOnly(true)
+    fontsize = 12
+  else -- editor-specific logic
+    ed:SetText("Some initial text in the editor")
+    ed:EmptyUndoBuffer()
+  end
+  local font = wx.wxFont(fontsize, wx.wxFONTFAMILY_MODERN, wx.wxFONTSTYLE_NORMAL, wx.wxFONTWEIGHT_NORMAL, false, "Courier New")
   ed:StyleSetFont(wxstc.wxSTC_STYLE_DEFAULT, font)
   ed:SetEOLMode(wxstc.wxSTC_EOL_LF) -- force LF as the line separator
   ed:SetWrapMode(wxstc.wxSTC_WRAP_WORD)
@@ -50,15 +58,6 @@ mgr:GetPane("editor2"):Right():Position(0)
 mgr:GetPane("log1"):Center():Position(1)
 mgr:GetPane("log2"):Right():Position(1)
 mgr:Update()
-
--- set logs read-only
-editors.log1:SetReadOnly(true)
-editors.log2:SetReadOnly(true)
--- set editor content
-editors.editor1:SetText("Some initial text in the editor")
-editors.editor1:EmptyUndoBuffer()
-editors.editor2:SetText(editors.editor1:GetText())
-editors.editor2:EmptyUndoBuffer()
 
 local function writelog(log, str)
   log:SetReadOnly(false)

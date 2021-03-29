@@ -61,17 +61,17 @@ if not table.unpack then table.unpack = unpack end
 -- traverse spaceDAG starting from node and calling `callback` for each part
 local function traverse_space_dag(node, isanc, callback)
   local offset = 0
-  local function helper(node, version, prev)
+  local function helper(node, version, prev, level)
     local deleted = node.deletedby:any(function(version) return isanc(version) end)
     -- callback may return `false` to indicate that traversal needs to be stopped
-    if callback(node, version, prev, offset, deleted) == false then return false end
+    if callback(node, version, prev, offset, deleted, level) == false then return false end
     if not deleted then offset = offset + node.elems:getlength() end
     for _, part in ipairs(node.parts) do
-      if isanc(part.version) and helper(part, part.version) == false then return false end
+      if isanc(part.version) and helper(part, part.version, nil, level + 1) == false then return false end
     end
-    if node.parts[0] and helper(node.parts[0], version, node) == false then return false end
+    if node.parts[0] and helper(node.parts[0], version, node, level) == false then return false end
   end
-  return helper(node, node.version)
+  return helper(node, node.version, nil, 1)
 end
 
 local function space_dag_get(node, index, is_anc)
@@ -156,6 +156,14 @@ create_space_dag_node = function(node, version, elems, deletedby)
             if not deleted then table.insert(values, node.elems:getvalue(offset)) end
           end)
         return table.concat(values)
+      end,
+      walkgraph = function(node, isanc, callback)
+        if not callback then return end
+        isanc = isanc or function() return true end
+        traverse_space_dag(node, isanc, function(node, version, prev, offset, deleted, level)
+            local params = {version = version, value = node.elems:getvalue(offset), level = level, isdeleted = deleted, isnode = prev == nil}
+            if callback(params) == false then return false end
+          end)
       end,
       get = space_dag_get,
       set = space_dag_set,
@@ -324,6 +332,14 @@ function M.createresource(version, elem)
           isanc = function(nodeversion) return ancestors[nodeversion] end
         end
         return resource.space:getvalue(isanc)
+      end,
+      walkgraph = function(resource, callback, version)
+        local isanc
+        if version then
+          local ancestors = resource:getancestors({[version] = true})
+          isanc = function(nodeversion) return ancestors[nodeversion] end
+        end
+        return resource.space:walkgraph(isanc, callback)
       end,
       getancestors = function(resource, versions)
         local results = {}

@@ -221,6 +221,19 @@ is(resource:getvalue(), "XA7", "Resource patch processed with overlapping delete
 is(resource:getpatchset("v10"), {{1, 0, {'A'}}}, "Resource patchset for the current version has expected patches (1/2).")
 is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the current version has expected patches (2/2).")
 
+callbacks = {}
+resource:walkgraph(function(args)
+    table.insert(callbacks, {args.version, args.value, args.level, args.isdeleted, args.isnode})
+  end)
+is(callbacks, {
+    {"v00", "X", 1, false, true},
+    {"v00", "1", 1, true, false},
+    {"v10", "A", 2, false, true},
+    {"v00", "23", 1, true, false},
+    {"v00", "456", 1, true, false},
+    {"v00", "7", 1, false, false},
+    }, "Calling walkgraph produces expected callbacks.")
+
 -- test linear versioning for string-based resources
 resource = sync9.createresource("v00", "")
 resource:addversion("v10", {{0, 0, 'X1'}})

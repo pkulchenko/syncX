@@ -379,9 +379,9 @@ function M.createresource(version, elem)
               table.insert(patchset, {offset, 0, node.elems:copy()})
             end
           elseif node.deletedby[version] and node.elems:getlength() > 0
-          -- skip if this entry is deleted by another ancestor patch
+          -- skip if this entry is deleted by another ancestor version
           and not node.deletedby:any(function(v) return v ~= version and isanc(v) end) then
-            -- delete: the patch is deleted by this version and is not delete by an ancestor patch
+            -- delete: the patch is deleted by this version and is not deleted by another ancestor version
             table.insert(patchset, {offset, node.elems:getlength()})
           end
         end

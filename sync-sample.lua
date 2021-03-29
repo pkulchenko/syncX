@@ -30,7 +30,7 @@ local function createPane(name)
   -- set indicator for the current editor
   ed.indicator = indicators[name]
   if ed.indicator then
-    ed:IndicatorSetStyle(ed.indicator, wxstc.wxSTC_INDIC_TEXTFORE)
+    ed:IndicatorSetStyle(ed.indicator, wxstc.wxSTC_INDIC_ROUNDBOX)
     ed:IndicatorSetForeground(ed.indicator, indicators[ed.indicator])
   end
 

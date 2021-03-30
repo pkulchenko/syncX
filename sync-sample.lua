@@ -1,4 +1,5 @@
 require "wx"
+local unpack = table.unpack or unpack
 local frame = wx.wxFrame(wx.NULL, wx.wxID_ANY, "syncX demo",
   wx.wxDefaultPosition, wx.wxSize(1020, 800), wx.wxDEFAULT_FRAME_STYLE)
 local autosync = {on = "Autosync: ON", off = "Autosync: OFF"}
@@ -11,19 +12,23 @@ local mgr = wxaui.wxAuiManager()
 mgr:SetManagedWindow(frame)
 
 -- describe two editors to have content and two to host the logs
-local editors = { editor1 = true, editor2 = true, log1 = true, log2 = true }
-local indicators = { editor1 = 1, editor2 = 2, wx.wxColour(200, 0, 0), wx.wxColour(0, 150, 0) }
+local editors = { editor1 = true, editor2 = true, log1 = true, log2 = true, graph1 = true, graph2 = true }
+local indicators = {
+  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(200, 0, 0)}, editor1 = 1,
+  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(0, 150, 0)}, editor2 = 2,
+  {wxstc.wxSTC_INDIC_STRIKE, wx.wxColour(200, 0, 0)}, graph1 = 3, graph2 = 3,
+}
 local id = 100
 local function getid() id = id + 1 return id end
 local function createPane(name)
   local ed = wxstc.wxStyledTextCtrl(frame, getid(), wx.wxDefaultPosition, wx.wxSize(500, 400), wx.wxBORDER_NONE)
   local fontsize = 14
-  if name:find("log") then -- log-specific logic
+  if name:find("editor") then -- editor-specific logic
+    ed:SetText("Editor text")
+    ed:EmptyUndoBuffer()
+  else
     ed:SetReadOnly(true)
     fontsize = 12
-  else -- editor-specific logic
-    ed:SetText("Some initial text in the editor")
-    ed:EmptyUndoBuffer()
   end
   local font = wx.wxFont(fontsize, wx.wxFONTFAMILY_MODERN, wx.wxFONTSTYLE_NORMAL, wx.wxFONTWEIGHT_NORMAL, false, "Courier New")
   ed:StyleSetFont(wxstc.wxSTC_STYLE_DEFAULT, font)
@@ -38,25 +43,23 @@ local function createPane(name)
   -- set indicator for the current editor
   ed.indicator = indicators[name]
   if ed.indicator then
-    ed:IndicatorSetStyle(ed.indicator, wxstc.wxSTC_INDIC_ROUNDBOX)
-    ed:IndicatorSetForeground(ed.indicator, indicators[ed.indicator])
+    local itype, icolor = unpack(indicators[ed.indicator])
+    ed:IndicatorSetStyle(ed.indicator, itype)
+    ed:IndicatorSetForeground(ed.indicator, icolor)
   end
 
-  mgr:AddPane(ed, wxaui.wxAuiPaneInfo():
-    Name(name):CaptionVisible(false):
-    Center():Position(0):
-    PaneBorder(true):Fixed(true):MinSize(500,400):MaxSize(500,400):CloseButton(false))
+  local pi = wxaui.wxAuiPaneInfo():
+  Name(name):CaptionVisible(false):
+  PaneBorder(true):Fixed(true):MinSize(500,200):MaxSize(500,200):CloseButton(false)
+  if name:find("1") then pi:Center() else pi:Right() end
+  pi:Position(name:find("editor") and 0 or name:find("log") and 1 or 2)
+  mgr:AddPane(ed, pi)
   ed.version = 0 -- set initial version
   return ed
 end
 
 -- assign editor objects
 for name in pairs(editors) do editors[name] = createPane(name) end
-
-mgr:GetPane("editor1"):Center():Position(0)
-mgr:GetPane("editor2"):Right():Position(0)
-mgr:GetPane("log1"):Center():Position(1)
-mgr:GetPane("log2"):Right():Position(1)
 mgr:Update()
 
 local function writelog(log, str)
@@ -79,13 +82,29 @@ local function setsync(editor)
         getlength = function(tbl) return tbl.n end,
         getvalue = function(tbl, offset) return editor:GetTextRange(offset, offset + tbl.n) end,
       }})
+  local function showgraph(editor)
+    -- update the graph representation
+    editor.graph:SetReadOnly(false)
+    editor.graph:ClearAll()
+    editor.sync:walkgraph(function(args)
+        local pos = editor.graph:GetLength()
+        local text = ("%s%s (%s)\n"):format((" "):rep(args.level), args.value, args.version)
+        editor.graph:AppendText(text)
+        -- table.insert(callbacks, {args.version, args.value, args.level, args.isdeleted, args.isnode})
+        if args.isdeleted then
+          editor.graph:SetIndicatorCurrent(editor.graph.indicator)
+          editor.graph:IndicatorFillRange(pos+args.level, #text-args.level)
+        end
+      end)
+    editor.graph:SetReadOnly(true)
+  end
   local resource = sync9.createresource(getnewversion(editor), data)
   resource:sethandler {
     version = function(resource, version)
       local origin = tonumber(version:match("_(.+)"), 16)
       if editor:GetId() ~= origin then -- remote update, apply the changes
         for _, patch in ipairs(resource:getpatchset(version)) do
-          local addidx, delcnt, value = (table.unpack or unpack)(patch)
+          local addidx, delcnt, value = unpack(patch)
           -- disable event handling, so that external updates don't trigger sync processing
           editor:SetEvtHandlerEnabled(false)
           if value and #value > 0 then
@@ -99,17 +118,21 @@ local function setsync(editor)
           editor:SetEvtHandlerEnabled(true)
         end
       end
+      showgraph(editor)
     end,
   }
   editor.sync = resource
+  showgraph(editor)
 end
 
 -- update editors to link their logs and their syncX trackers
-setsync(editors.editor1)
-setsync(editors.editor2)
-
+editors.editor1.graph = editors.graph1
+editors.editor2.graph = editors.graph2
 editors.editor1.log = editors.log1
 editors.editor2.log = editors.log2
+
+setsync(editors.editor1)
+setsync(editors.editor2)
 
 editors.log1.sync = editors.editor2.sync
 editors.log2.sync = editors.editor1.sync
@@ -166,7 +189,7 @@ statusbar:Connect(wx.wxEVT_LEFT_DOWN, function (event)
     statusbar:SetStatusText(statusbar:GetStatusText(0) == autosync.on and autosync.off or autosync.on, 0)
   end)
 
-frame:Connect(wx.wxEVT_CLOSE_WINDOW, function(event) mgr:UnInit() event:Skip() end)
+frame:Connect(wx.wxEVT_CLOSE_WINDOW, function(event) mgr:UnInit() event:Skip() os.exit() end)
 frame:SetMinSize(frame:GetSize())
 frame:Show(true)
 -- set the focus on the first editor at the first opportunity

@@ -34,12 +34,34 @@ local function createPane(name)
   ed:StyleSetFont(wxstc.wxSTC_STYLE_DEFAULT, font)
   ed:SetEOLMode(wxstc.wxSTC_EOL_LF) -- force LF as the line separator
   ed:SetWrapMode(wxstc.wxSTC_WRAP_WORD)
-  ed:SetMarginType(0, wxstc.wxSTC_MARGIN_NUMBER)
-  ed:SetMarginMask(0, 0)
-  ed:SetMarginWidth(0, 36)
-  ed:SetMarginType(1, wxstc.wxSTC_MARGIN_SYMBOL)
-  ed:SetMarginSensitive(1, true)
-  ed:SetMarginWidth(1, 36)
+
+  if name:find("editor") then
+    ed:SetMarginType(0, wxstc.wxSTC_MARGIN_NUMBER)
+    ed:SetMarginMask(0, 0)
+    ed:SetMarginWidth(0, 36)
+  elseif name:find("log") then
+    ed:SetMarginType(0, wxstc.wxSTC_MARGIN_SYMBOL)
+    ed:SetMarginSensitive(0, true)
+    ed:SetMarginWidth(0, 36)
+  elseif name:find("graph") then -- graph editor-specific logic
+    local foldtypes = {
+      [0] = { wxstc.wxSTC_MARKNUM_FOLDEROPEN, wxstc.wxSTC_MARKNUM_FOLDER,
+        wxstc.wxSTC_MARKNUM_FOLDERSUB, wxstc.wxSTC_MARKNUM_FOLDERTAIL, wxstc.wxSTC_MARKNUM_FOLDEREND,
+        wxstc.wxSTC_MARKNUM_FOLDEROPENMID, wxstc.wxSTC_MARKNUM_FOLDERMIDTAIL,
+      },
+      fold = { wxstc.wxSTC_MARK_ARROWDOWN, wxstc.wxSTC_MARK_ARROW },
+    }
+    ed:SetMarginType(0, wxstc.wxSTC_MARGIN_SYMBOL)
+    ed:SetMarginMask(0, wxstc.wxSTC_MASK_FOLDERS)
+    ed:SetMarginSensitive(0, true)
+    ed:SetMarginWidth(0, 36)
+    ed:SetAutomaticFold(7)
+    local fg, bg = wx.wxWHITE, wx.wxColour(128, 128, 128)
+    for m = 1, #foldtypes[0] do
+      ed:MarkerDefine(foldtypes[0][m], foldtypes.fold[m] or wxstc.wxSTC_MARK_EMPTY, fg, bg)
+    end
+  end
+
   -- set indicator for the current editor
   ed.indicator = indicators[name]
   if ed.indicator then
@@ -87,14 +109,23 @@ local function setsync(editor)
     editor.graph:SetReadOnly(false)
     editor.graph:ClearAll()
     editor.sync:walkgraph(function(args)
-        local pos = editor.graph:GetLength()
-        local text = ("%s%s (%s)\n"):format((" "):rep(args.level), args.value, args.version)
-        editor.graph:AppendText(text)
-        -- table.insert(callbacks, {args.version, args.value, args.level, args.isdeleted, args.isnode})
+        local greditor = editor.graph
+        local pos = greditor:GetLength()
+        local text = ("%s%s: %q\n"):format((" "):rep(args.level), args.version, args.value:gsub("\n","\013"))
+        greditor:AppendText(text)
+        -- set the indicator for deleted nodes
         if args.isdeleted then
-          editor.graph:SetIndicatorCurrent(editor.graph.indicator)
-          editor.graph:IndicatorFillRange(pos+args.level, #text-args.level)
+          greditor:SetIndicatorCurrent(greditor.indicator)
+          greditor:IndicatorFillRange(pos+args.level, #text-args.level)
         end
+        -- set folding
+        local lines = greditor:GetLineCount()
+        local level = args.level + wxstc.wxSTC_FOLDLEVELBASE
+        -- if the previous line is a node or has a different level, then make it a header
+        if args.isnode or lines > 1 and greditor:GetFoldLevel(lines-2) ~= level then
+          greditor:SetFoldLevel(lines-2, level + wxstc.wxSTC_FOLDLEVELHEADERFLAG)
+        end
+        greditor:SetFoldLevel(lines-1, level)
       end)
     editor.graph:SetReadOnly(true)
   end

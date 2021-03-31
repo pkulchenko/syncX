@@ -14,9 +14,8 @@ mgr:SetManagedWindow(frame)
 -- describe two editors to have content and two to host the logs
 local editors = { editor1 = true, editor2 = true, log1 = true, log2 = true, graph1 = true, graph2 = true }
 local indicators = {
-  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(200, 0, 0)}, editor1 = 1,
-  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(0, 150, 0)}, editor2 = 2,
-  {wxstc.wxSTC_INDIC_STRIKE, wx.wxColour(200, 0, 0)}, graph1 = 3, graph2 = 3,
+  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(0, 150, 0)}, editor1 = 1, editor2 = 1,
+  {wxstc.wxSTC_INDIC_STRIKE, wx.wxColour(200, 0, 0)}, graph1 = 2, graph2 = 2,
 }
 local id = 100
 local function getid() id = id + 1 return id end
@@ -28,7 +27,7 @@ local function createPane(name)
     ed:EmptyUndoBuffer()
   else
     ed:SetReadOnly(true)
-    fontsize = 12
+    fontsize = name:find("log") and 12 or 10
   end
   local font = wx.wxFont(fontsize, wx.wxFONTFAMILY_MODERN, wx.wxFONTSTYLE_NORMAL, wx.wxFONTWEIGHT_NORMAL, false, "Courier New")
   ed:StyleSetFont(wxstc.wxSTC_STYLE_DEFAULT, font)

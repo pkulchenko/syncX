@@ -188,7 +188,7 @@ local function editormodified(event)
   editor.sync:addversion(version, {{pos, inserted and 0 or length, inserted and text or {}}})
 
   local parents = {}
-  for version in pairs(editor.sync:getparents(version)) do table.insert(parents, version .. " = true") end
+  for ver in pairs(editor.sync:getparents(version)) do table.insert(parents, ver .. " = true") end
   writelog(editor.log, ("%s, {%s,%s,%q}, {%s}"):format(version, pos, inserted and 0 or length,
       inserted and text or '', table.concat(parents, ", "))
     :gsub(',{""}', ""):gsub("\010","n"):gsub("\026","\\026").."\n")
@@ -215,7 +215,7 @@ local function synconidle(event) if statusbar:GetStatusText(0) == autosync.on th
 editors.log1:Connect(wx.wxEVT_IDLE, synconidle)
 editors.log2:Connect(wx.wxEVT_IDLE, synconidle)
 
-statusbar:Connect(wx.wxEVT_LEFT_DOWN, function (event)
+statusbar:Connect(wx.wxEVT_LEFT_DOWN, function ()
     statusbar:SetStatusText(statusbar:GetStatusText(0) == autosync.on and autosync.off or autosync.on, 0)
   end)
 

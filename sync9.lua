@@ -252,7 +252,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       if d >= 0 then return end -- trying to insert at or after the max index
       deleteupto = addidx + delcnt
 
-      if val then
+      if val and #val > 0 then
         if addidx == offset and prev then
           -- defer updates, otherwise inserted nodes affect position tracking
           patchset:defer(function()

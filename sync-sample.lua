@@ -117,14 +117,15 @@ local function setsync(editor)
           greditor:SetIndicatorCurrent(greditor.indicator)
           greditor:IndicatorFillRange(pos+args.level, #text-args.level)
         end
-        -- set folding
-        local lines = greditor:GetLineCount()
+        -- each line has a new line and first index is 0, so the last added line is total-2
+        local lineidx = greditor:GetLineCount()-2
         local level = args.level + wxstc.wxSTC_FOLDLEVELBASE
-        -- if the previous line is a node or has a different level, then make it a header
-        if args.isnode or lines > 1 and greditor:GetFoldLevel(lines-2) ~= level then
-          greditor:SetFoldLevel(lines-2, level + wxstc.wxSTC_FOLDLEVELHEADERFLAG)
+        -- if the previous line has a different level, then make it a header
+        if lineidx > 0 and greditor:GetFoldLevel(lineidx-1) < level then
+          -- decrease the level on the previous one comparing to the current one
+          greditor:SetFoldLevel(lineidx-1, level - 1 + wxstc.wxSTC_FOLDLEVELHEADERFLAG)
         end
-        greditor:SetFoldLevel(lines-1, level)
+        greditor:SetFoldLevel(lineidx, level)
       end)
     editor.graph:SetReadOnly(true)
   end

@@ -74,34 +74,6 @@ local function traverse_space_dag(node, isanc, callback)
   return helper(node, node.version, nil, 1)
 end
 
-local function space_dag_get(node, index, is_anc)
-  -- index value is 0-based
-  local value
-  local offset = 0
-  traverse_space_dag(node, is_anc or function() return true end,
-    function(node)
-      if (index - offset < node.elems:getlength()) then
-        value = node.elems[index - offset + 1]
-        return false
-      end
-      offset = offset + node.elems:getlength()
-    end)
-  return value
-end
-
-local function space_dag_set(node, index, value, is_anc)
-  -- index value is 0-based
-  local offset = 0
-  traverse_space_dag(node, is_anc or function() return true end,
-    function(node)
-      if (index - offset < node.elems:getlength()) then
-        node.elems[index - offset + 1] = value
-        return false
-      end
-      offset = offset + node.elems:getlength()
-    end)
-end
-
 local create_space_dag_node, space_dag_add_patchset -- forward declarations
 local function copy(tbl)
   local res = setmetatable({}, getmetatable(tbl))
@@ -129,6 +101,47 @@ local metastrelems = {__index = {
     getvalue = function(tbl) return tbl[0] end,
     copy = function(tbl) return tbl[0] end,
   }}
+
+local function metafy(elems)
+  return (type(elems) == "string" and setmetatable({[0] = elems}, metastrelems)
+    or getmetatable(elems) and elems
+    or setmetatable(elems or {}, metatblelems))
+end
+
+local function space_dag_get(node, index, is_anc)
+  -- if index is not specified, then return elements
+  if not index then return node.elems end
+  -- index value is 0-based
+  local value
+  local offset = 0
+  traverse_space_dag(node, is_anc or function() return true end,
+    function(node)
+      if (index - offset < node.elems:getlength()) then
+        value = node.elems[index - offset + 1]
+        return false
+      end
+      offset = offset + node.elems:getlength()
+    end)
+  return value
+end
+
+local function space_dag_set(node, index, value, is_anc)
+  -- if index is not specified, then assign elements
+  if not index then
+    node.elems = metafy(value)
+    return
+  end
+  -- index value is 0-based
+  local offset = 0
+  traverse_space_dag(node, is_anc or function() return true end,
+    function(node)
+      if (index - offset < node.elems:getlength()) then
+        node.elems[index - offset + 1] = value
+        return false
+      end
+      offset = offset + node.elems:getlength()
+    end)
+end
 
 create_space_dag_node = function(node, version, elems, deletedby)
   assert(not elems or type(elems) == "table" or type(elems) == "string", "Unexpected elements type (not 'string' or 'table')")
@@ -161,7 +174,15 @@ create_space_dag_node = function(node, version, elems, deletedby)
         if not callback then return end
         isanc = isanc or function() return true end
         traverse_space_dag(node, isanc, function(node, version, prev, offset, deleted, level)
-            local params = {version = version, value = node.elems:getvalue(offset), level = level, isdeleted = deleted, isnode = prev == nil}
+            local params = {
+              version = version,
+              value = node.elems:getvalue(offset),
+              offset = offset,
+              level = level,
+              isdeleted = deleted,
+              isnode = prev == nil,
+              node = node,
+            }
             if callback(params) == false then return false end
           end)
       end,
@@ -172,9 +193,7 @@ create_space_dag_node = function(node, version, elems, deletedby)
   return setmetatable({
       version = version, -- node version as a string
       -- list of elements this node stores; keep its metatable if one is proved
-      elems = (type(elems) == "string" and setmetatable({[0] = elems}, metastrelems)
-        or getmetatable(elems) and elems
-        or setmetatable(elems or {}, metatblelems)),
+      elems = metafy(elems),
       deletedby = setmetatable(deletedby or {}, metaparts), -- hash of versions this node is deleted by
       parts = setmetatable({}, metaparts), -- list of nodes that are children of this one
       }, metanode)

@@ -11,6 +11,10 @@ statusbar:SetStatusText(autosync.on, 0)
 local mgr = wxaui.wxAuiManager()
 mgr:SetManagedWindow(frame)
 
+local onidle = {}
+local function doWhenIdle(func) table.insert(onidle, func) end
+frame:Connect(wx.wxEVT_IDLE, function() if #onidle > 0 then table.remove(onidle, 1)() end end)
+
 -- describe two editors to have content and two to host the logs
 local editors = { editor1 = true, editor2 = true, log1 = true, log2 = true, graph1 = true, graph2 = true }
 local indicators = {
@@ -76,6 +80,7 @@ local function createPane(name)
   pi:Position(name:find("editor") and 0 or name:find("log") and 1 or 2)
   mgr:AddPane(ed, pi)
   ed.version = 0 -- set initial version
+  ed.deletes = {} -- set empty list of deletes
   return ed
 end
 
@@ -133,9 +138,13 @@ local function setsync(editor)
   resource:sethandler {
     version = function(resource, version)
       local origin = tonumber(version:match("_(.+)"), 16)
-      if editor:GetId() ~= origin then -- remote update, apply the changes
-        for _, patch in ipairs(resource:getpatchset(version)) do
-          local addidx, delcnt, value = unpack(patch)
+      for _, patch in ipairs(resource:getpatchset(version)) do
+        local addidx, delcnt, value = unpack(patch)
+        -- save the text that is going to be removed
+        if delcnt > 0 then
+          table.insert(editor.deletes, {offset = addidx, text = editor:GetTextRange(addidx, addidx+delcnt)})
+        end
+        if editor:GetId() ~= origin then -- remote update, apply the changes
           -- disable event handling, so that external updates don't trigger sync processing
           editor:SetEvtHandlerEnabled(false)
           -- make a replacement
@@ -147,7 +156,23 @@ local function setsync(editor)
           editor:SetEvtHandlerEnabled(true)
         end
       end
-      showgraph(editor)
+
+      -- walk the tree and apply deletes to keep their values
+      -- (this is only needed, as the shallow structure relies on
+      -- the document to have the values, which are not present for deletes)
+      local deletes = editor.deletes
+      editor.deletes = {}
+      doWhenIdle(function()
+          resource:walkgraph(function(args)
+              if #deletes == 0 then return false end
+              if args.isdeleted and args.node:get().n and deletes[1].offset == args.offset then
+                args.node:set(nil, deletes[1].text)
+                table.remove(deletes, 1)
+              end
+            end)
+        end)
+
+      doWhenIdle(function() showgraph(editor) end)
     end,
   }
   editor.sync = resource
@@ -172,11 +197,11 @@ local function editormodified(event)
   local pos = event:GetPosition()
   local length = event:GetLength()
   local editor = event:GetEventObject():DynamicCast("wxStyledTextCtrl")
-  local inserted = bit.band(evtype, wxstc.wxSTC_MOD_INSERTTEXT) ~= 0
-  local deleted = bit.band(evtype, wxstc.wxSTC_MOD_DELETETEXT) ~= 0
+  local inserted = bit.band(evtype, wxstc.wxSTC_MOD_BEFOREINSERT) ~= 0
+  local deleted = bit.band(evtype, wxstc.wxSTC_MOD_BEFOREDELETE) ~= 0
   if not inserted and not deleted then return end
   local version = getnewversion(editor)
-  local text = editor:GetTextRange(pos, pos+length)
+  local text = event:GetText()
   if inserted then
     -- color added text with the default color
     editor:SetIndicatorCurrent(editor.indicator)
@@ -222,5 +247,5 @@ frame:Connect(wx.wxEVT_CLOSE_WINDOW, function(event) mgr:UnInit() event:Skip() o
 frame:SetMinSize(frame:GetSize())
 frame:Show(true)
 -- set the focus on the first editor at the first opportunity
-frame:Connect(wx.wxEVT_IDLE, function() editors.editor1:SetFocus() frame:Disconnect(wx.wxEVT_IDLE) end)
+doWhenIdle(function() editors.editor1:SetFocus() end)
 wx.wxGetApp():MainLoop()

@@ -138,14 +138,12 @@ local function setsync(editor)
           local addidx, delcnt, value = unpack(patch)
           -- disable event handling, so that external updates don't trigger sync processing
           editor:SetEvtHandlerEnabled(false)
-          if value and #value > 0 then
-            editor:InsertText(addidx, value)
-            editor:SetIndicatorCurrent(editor.indicator)
-            editor:IndicatorFillRange(addidx, #value)
-          end
-          if delcnt > 0 then
-            editor:DeleteRange(addidx, delcnt)
-          end
+          -- make a replacement
+          editor:SetTargetRange(addidx, addidx+delcnt)
+          editor:ReplaceTarget(value or "")
+          -- add modification indicator
+          editor:SetIndicatorCurrent(editor.indicator)
+          editor:IndicatorFillRange(addidx, value and #value or 0)
           editor:SetEvtHandlerEnabled(true)
         end
       end

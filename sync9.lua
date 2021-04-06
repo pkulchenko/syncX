@@ -246,7 +246,11 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
     if isdeleted then
       -- this patch only adds elements at the current offset
       if delcnt == 0 and addidx == offset then
+        -- this check is needed to enforce the order of items added inside of a deleted node.
+        -- Without this check the order depends on the sorting of version numbers,
+        -- which is not ideal for local edits, even though the produced graph is more compact
         if nodelength == 0 and hasparts then return end
+        -- break the node if insert is at the beginning of the node
         if nodelength > 0 then space_dag_break_node(node, 0) end
         node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
         patchset:next()

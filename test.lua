@@ -224,15 +224,15 @@ is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the cur
 
 callbacks = {}
 resource:walkgraph(function(args)
-    table.insert(callbacks, {args.version, args.value, args.level, args.isdeleted, args.isnode})
+    table.insert(callbacks, {args.version, args.value, args.level, args.offset, args.isdeleted, args.isnode})
   end)
 is(callbacks, {
-    {"v00", "X", 1, false, true},
-    {"v00", "1", 1, true, false},
-    {"v10", "A", 2, false, true},
-    {"v00", "23", 1, true, false},
-    {"v00", "456", 1, true, false},
-    {"v00", "7", 1, false, false},
+    {"v00", "X", 1, 0, false, true},
+    {"v00", "1", 1, 1, true, false},
+    {"v10", "A", 2, 1, false, true},
+    {"v00", "23", 1, 2, true, false},
+    {"v00", "456", 1, 2, true, false},
+    {"v00", "7", 1, 2, false, false},
     }, "Calling walkgraph produces expected callbacks.")
 
 -- test linear versioning for string-based resources

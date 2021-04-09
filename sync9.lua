@@ -58,7 +58,7 @@ end
 
 if not table.unpack then table.unpack = unpack end
 
--- traverse spaceDAG starting from node and calling `callback` for each part
+-- traverse space graph starting from `node` and calling `callback` for each part
 local function traverse_space_dag(node, isanc, callback)
   local offset = 0
   local function helper(node, version, prev, level)

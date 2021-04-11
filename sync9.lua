@@ -199,7 +199,7 @@ create_space_dag_node = function(node, version, elems, deletedby)
       }, metanode)
 end
 
-local function space_dag_break_node(node, splitidx, newpart)
+local function space_dag_break_node(node, splitidx)
   assert(splitidx >= 0)
   local tail = create_space_dag_node(node, nil,
     setmetatable(node.elems:slice(splitidx+1), getmetatable(node.elems)),
@@ -207,7 +207,7 @@ local function space_dag_break_node(node, splitidx, newpart)
   tail.parts = node.parts
 
   node.elems = setmetatable(node.elems:slice(1, splitidx), getmetatable(node.elems))
-  node.parts = setmetatable(newpart and {newpart} or {}, getmetatable(node.parts))
+  node.parts = setmetatable({}, getmetatable(node.parts))
   node.parts[0] = tail
   return tail
 end

@@ -404,7 +404,7 @@ function M.createresource(version, elem)
       getspace = function(resource) return resource.space end,
       gettime = function(resource, version) return resource.time[version] end,
       getparents = function(resource, version)
-        return version and resource.time[version] or resource.futureparents
+        return version and resource.time[version] or resource.futureparents:copy()
       end,
       -- generates patchset for a particular version
       getpatchset = function(resource, version, versions)

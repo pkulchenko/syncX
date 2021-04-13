@@ -9,6 +9,7 @@ end
 local docraw = ''
 local docsync = sync9.createresource(0, "")
 local seed = math.random(10000)
+math.randomseed(seed)
 
 for i = 1, 5000 do
   if i % 1000 == 0 then
@@ -30,5 +31,6 @@ for i = 1, 5000 do
 
   if docsync:getvalue() ~= docraw then
     print(("Failed test %s (seed=%d)\nexpected %s\nreceived %s\n"):format(i, seed, docsync:getvalue(), docraw))
+    os.exit()
   end
 end

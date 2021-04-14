@@ -305,7 +305,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
         if deleteupto < offset + nodelength then
           space_dag_break_node(node, deleteupto - offset)
           -- increase the number of deleted elements subtracting the number of added ones
-          deletedcnt = deletedcnt + deleteupto - offset - #(val or {})
+          deletedcnt = deletedcnt + deleteupto - offset - (val and #val or 0)
         end
         patchset:next()
       end

@@ -28,6 +28,15 @@ local function mergependingpatches(docidx, num)
   end
 end  
 
+local function getgraph(resource)
+  local callbacks = {}
+  resource:walkgraph(function(args)
+    table.insert(callbacks, table.concat({args.version, args.value, args.level, args.offset,
+          args.isdeleted and "t" or "f", args.isnode and "t" or "f"}, "-"))
+  end)
+  return table.concat(callbacks, ";")
+end
+
 local seed = math.random(10000)
 math.randomseed(seed)
 
@@ -44,10 +53,10 @@ for i = 1, 2000 do
   local version = ("%06d-%s"):format(i, docidx)
   local parents = docsyncs[docidx]:getparents()
 
-  local insert = docsize == 0 or math.random() < 0.55
+  local insert = docsize == 0 or math.random() < 0.5
   -- insert can be done before and after a position, but delete only before
   local pos = math.random(docsize + (insert and 1 or 0)) - 1
-  local length = math.random(math.min(10, math.max(1, docsize)))
+  local length = math.random(math.min(10, insert and 10 or math.max(1, docsize)))
   local content = randchar():rep(length)
   
   -- distribute the patch among the documents
@@ -73,10 +82,16 @@ for i = 1, 2000 do
   for i = 1, #patches do pendingcnt = pendingcnt + #patches[i] end
   if pendingcnt == 0 then
     local value = docsyncs[1]:getvalue()
+    local graph = getgraph(docsyncs[1])
     for i = 2, #patches do
       if value ~= docsyncs[i]:getvalue() then
-        print(("Failed test %s (seed=%d)\n1=%s\n%d=%s\n"):format(
+        print(("Failed value comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
             i, seed, value, i, docsyncs[i]:getvalue()))
+        os.exit()
+      end
+      if graph ~= getgraph(docsyncs[i]) then
+        print(("Failed graph comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
+            i, seed, graph, i, getgraph(docsyncs[i])))
         os.exit()
       end
     end

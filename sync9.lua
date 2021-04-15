@@ -199,7 +199,7 @@ create_space_dag_node = function(node, version, elems, deletedby)
       }, metanode)
 end
 
-local function space_dag_break_node(node, splitidx)
+local function space_dag_break_node(node, splitidx, version)
   assert(splitidx >= 0)
   local tail = create_space_dag_node(node, nil,
     setmetatable(node.elems:slice(splitidx+1), getmetatable(node.elems)),
@@ -209,6 +209,7 @@ local function space_dag_break_node(node, splitidx)
   node.elems = setmetatable(node.elems:slice(1, splitidx), getmetatable(node.elems))
   node.parts = setmetatable({}, getmetatable(node.parts))
   node.parts[0] = tail
+  if splitidx == 0 and version then node.deletedby[version] = true end
   return tail
 end
 
@@ -264,7 +265,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       local d = addidx - (offset + nodelength)
       if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
-      if d ~= 0 then space_dag_break_node(node, addidx - offset) end
+      if d ~= 0 then space_dag_break_node(node, addidx - offset, nodeversion) end
       node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
       patchset:next()
       return
@@ -283,7 +284,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
             end)
           -- fall through to the next check for `deleteupto`
         else
-          space_dag_break_node(node, addidx - offset)
+          space_dag_break_node(node, addidx - offset, nodeversion)
           -- defer updates, otherwise inserted nodes affect position tracking
           patchset:defer(function()
               node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
@@ -294,7 +295,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
         if addidx == offset then
           -- fall through to the next check for `deleteupto`
         else
-          space_dag_break_node(node, addidx - offset)
+          space_dag_break_node(node, addidx - offset, nodeversion)
           return
         end
       end
@@ -303,7 +304,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
     if deleteupto > offset then
       if deleteupto <= offset + nodelength then
         if deleteupto < offset + nodelength then
-          space_dag_break_node(node, deleteupto - offset)
+          space_dag_break_node(node, deleteupto - offset, nodeversion)
           -- increase the number of deleted elements subtracting the number of added ones
           deletedcnt = deletedcnt + deleteupto - offset - (val and #val or 0)
         end

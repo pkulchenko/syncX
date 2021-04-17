@@ -209,7 +209,7 @@ is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the cur
 is(resource:getpatchset("v20"), {{0, 0, {'A', 'A'}}}, "Resource patchset for the current version has expected patches (3/3).")
 
 -- test branching replacement and overlapping deletion
-resource = sync9.createresource("v00", {'X', '1', '2', '3', '4', '5', '6','7'})
+resource = sync9.createresource("v00", {'X', '1', '2', '3', '4', '5', '6', '7'})
 
 resource:addversion("v10", {{2, 2, {'A'}}}, {v00 = true})
 is(resource:getvalue("v10"), "X1A4567", "Resource patch processed with overlapping deletes (1/4).")

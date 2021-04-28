@@ -80,7 +80,6 @@ local function createPane(name)
   pi:Position(name:find("editor") and 0 or name:find("log") and 1 or 2)
   mgr:AddPane(ed, pi)
   ed.version = 0 -- set initial version
-  ed.deletes = {} -- set empty list of deletes
   return ed
 end
 
@@ -103,11 +102,6 @@ end
 -- setup syncX structures to keep track of editor changes
 local function setsync(editor)
   local sync9 = require "sync9"
-  local data = setmetatable({n = editor:GetLength()}, {__index = {
-        slice = function(tbl, i, j) return {n = (j or tbl.n) - i + 1} end,
-        getlength = function(tbl) return tbl.n end,
-        getvalue = function(tbl, offset) return editor:GetTextRange(offset, offset + tbl.n) end,
-      }})
   local function showgraph(editor)
     -- update the graph representation
     editor.graph:SetReadOnly(false)
@@ -134,16 +128,12 @@ local function setsync(editor)
       end)
     editor.graph:SetReadOnly(true)
   end
-  local resource = sync9.createresource(getnewversion(editor), data)
+  local resource = sync9.createresource(getnewversion(editor), editor:GetText())
   resource:sethandler {
     version = function(resource, version)
       local origin = tonumber(version:match("_(.+)"), 16)
       for _, patch in ipairs(resource:getpatchset(version)) do
         local addidx, delcnt, value = unpack(patch)
-        -- save the text that is going to be removed
-        if delcnt > 0 then
-          table.insert(editor.deletes, {offset = addidx, text = editor:GetTextRange(addidx, addidx+delcnt)})
-        end
         if editor:GetId() ~= origin then -- remote update, apply the changes
           -- disable event handling, so that external updates don't trigger sync processing
           editor:SetEvtHandlerEnabled(false)
@@ -156,21 +146,6 @@ local function setsync(editor)
           editor:SetEvtHandlerEnabled(true)
         end
       end
-
-      -- walk the tree and apply deletes to keep their values
-      -- (this is only needed, as the shallow structure relies on
-      -- the document to have the values, which are not present for deletes)
-      local deletes = editor.deletes
-      editor.deletes = {}
-      doWhenIdle(function()
-          resource:walkgraph(function(args)
-              if #deletes == 0 then return false end
-              if args.isdeleted and args.node:get().n and deletes[1].offset == args.offset then
-                args.node:set(nil, deletes[1].text)
-                table.remove(deletes, 1)
-              end
-            end)
-        end)
 
       doWhenIdle(function() showgraph(editor) end)
     end,

@@ -143,7 +143,7 @@ local function space_dag_set(node, index, value, is_anc)
     end)
 end
 
-create_space_dag_node = function(node, version, elems, deletedby)
+create_space_dag_node = function(version, elems, deletedby)
   assert(not elems or type(elems) == "table" or type(elems) == "string", "Unexpected elements type (not 'string' or 'table')")
   assert(not deletedby or type(deletedby) == "table")
 
@@ -201,7 +201,7 @@ end
 
 local function space_dag_break_node(node, splitidx, version)
   assert(splitidx >= 0)
-  local tail = create_space_dag_node(node, nil,
+  local tail = create_space_dag_node(nil,
     setmetatable(node.elems:slice(splitidx+1), getmetatable(node.elems)),
     node.deletedby:copy())
   tail.parts = node.parts
@@ -253,7 +253,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
         if nodelength == 0 and hasparts then return end
         -- break the node if insert is at the beginning of the node
         if nodelength > 0 then space_dag_break_node(node, 0) end
-        node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+        node.parts:spliceinto(create_space_dag_node(nodeversion, val))
         patchset:next()
       end
       return
@@ -266,7 +266,7 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
       if d > 0 then return end -- trying to insert after the max index
       if d == 0 and hasparts then return end -- shortcuts the processing to add a new element to a new node to enforce the order
       if d ~= 0 then space_dag_break_node(node, addidx - offset, nodeversion) end
-      node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+      node.parts:spliceinto(create_space_dag_node(nodeversion, val))
       patchset:next()
       return
     end
@@ -280,14 +280,14 @@ space_dag_add_patchset = function(node, nodeversion, patchset, isanc)
         if addidx == offset and prev then
           -- defer updates, otherwise inserted nodes affect position tracking
           patchset:defer(function()
-              node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+              node.parts:spliceinto(create_space_dag_node(nodeversion, val))
             end)
           -- fall through to the next check for `deleteupto`
         else
           space_dag_break_node(node, addidx - offset, nodeversion)
           -- defer updates, otherwise inserted nodes affect position tracking
           patchset:defer(function()
-              node.parts:spliceinto(create_space_dag_node(node, nodeversion, val))
+              node.parts:spliceinto(create_space_dag_node(nodeversion, val))
             end)
           return
         end
@@ -342,7 +342,7 @@ local metaparents = {__index = {
   }}
 
 local M = {
-  createspace = function(...) return create_space_dag_node(nil, ...) end,
+  createspace = create_space_dag_node,
 }
 
 function M.createresource(version, elem)

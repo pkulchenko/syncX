@@ -13,16 +13,17 @@ is(resource:get(0), "0", "Get processed (1/2).")
 is(resource:get(3), "3", "Get processed (2/2).")
 
 -- test inserts
-resource = sync9.createspace("0", {'X', '1'})
-is(resource:getvalue(), "X1", "Space created.")
+resource = sync9.createspace("0", {'X.Y', '1.2'})
+is(resource:getvalue(), "X.Y1.2", "Space created.")
+is(resource:getlength(), 2, "Space created with expected length.")
 resource:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
-is(resource:getvalue(), "XABBA1", "Patchset processed with two patches inserted at different positions.")
+is(resource:getvalue(), "X.YABBA1.2", "Patchset processed with two patches inserted at different positions.")
 resource:addpatchset("30", {{3, 0, {'C', 'C'}}})
-is(resource:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
+is(resource:getvalue(), "X.YABCCBA1.2", "Patch processed with 2 elements inserted at position 3.")
 resource:addpatchset("40", {{4, 0, {'D'}}})
-is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
+is(resource:getvalue(), "X.YABCDCBA1.2", "Patch processed with 2 elements inserted at position 4.")
 resource:addpatchset("50", {{1, 0, {}}})
-is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
+is(resource:getvalue(), "X.YABCDCBA1.2", "Patch processed with no deletes and no additions.")
 
 -- test deletes
 resource = sync9.createspace("0", {'X', '1', '2', '3'})

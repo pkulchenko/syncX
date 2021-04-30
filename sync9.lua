@@ -91,7 +91,7 @@ local metaparts = {__index = {
 local metatblelems = {__index = {
     slice = function(...) return {table.unpack(...)} end,
     getlength = function(tbl) return #tbl end,
-    getvalue = function(tbl) return table.concat(tbl, "") end,
+    getvalue = function(tbl) return tbl end,
     copy = copy,
   }}
 -- metatable to handle elements as a string
@@ -165,10 +165,19 @@ create_space_dag_node = function(version, elems, deletedby)
       getvalue = function(node, isanc)
         isanc = isanc or function() return true end
         local values = {}
+        local vtype
         traverse_space_dag(node, isanc, function(node, _, _, offset, deleted)
-            if not deleted then table.insert(values, node.elems:getvalue(offset)) end
+            if not deleted then
+              local value = node.elems:getvalue(offset)
+              -- store the value type if it's not set or if there are no elements
+              -- (in case the initial empty value is of a "wrong" type,
+              -- for example, an empty table instead of an empty string)
+              vtype = #values > 0 and vtype or type(value)
+              if vtype ~= type(value) then error("Inconsistent value types") end
+              splice(values, #values+1, 0, table.unpack(vtype ~= "table" and {value} or value))
+            end
           end)
-        return table.concat(values)
+        return vtype == "table" and values or table.concat(values)
       end,
       walkgraph = function(node, isanc, callback)
         if not callback then return end

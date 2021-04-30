@@ -184,7 +184,7 @@ local function editormodified(event)
   end
 
   -- don't need to specify the parents, as all "future parents" will be used by default joining them together
-  editor.sync:addversion(version, {{pos, inserted and 0 or length, inserted and text or {}}})
+  editor.sync:addversion(version, {{pos, inserted and 0 or length, inserted and text or ""}})
 
   local parents = {}
   for ver in pairs(editor.sync:getparents(version)) do table.insert(parents, ver .. " = true") end

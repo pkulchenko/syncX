@@ -5,39 +5,39 @@ local resource
 
 -- test get/set methods
 resource = sync9.createspace("0", {'X', '1', '2', '3'})
-is(resource:getvalue(), "X123", "Space created with expected value.")
+is(resource:getvalue(), {'X', '1', '2', '3'}, "Space created with expected value.")
 is(resource:getlength(), 4, "Space created with expected length.")
 resource:set(0, "0")
-is(resource:getvalue(), "0123", "Set processed.")
+is(resource:getvalue(), {'0', '1', '2', '3'}, "Set processed.")
 is(resource:get(0), "0", "Get processed (1/2).")
 is(resource:get(3), "3", "Get processed (2/2).")
 
 -- test inserts
 resource = sync9.createspace("0", {'X.Y', '1.2'})
-is(resource:getvalue(), "X.Y1.2", "Space created.")
+is(resource:getvalue(), {'X.Y', '1.2'}, "Space created.")
 is(resource:getlength(), 2, "Space created with expected length.")
 resource:addpatchset("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
-is(resource:getvalue(), "X.YABBA1.2", "Patchset processed with two patches inserted at different positions.")
+is(resource:getvalue(), {'X.Y', 'A', 'B', 'B', 'A', '1.2'}, "Patchset processed with two patches inserted at different positions.")
 resource:addpatchset("30", {{3, 0, {'C', 'C'}}})
-is(resource:getvalue(), "X.YABCCBA1.2", "Patch processed with 2 elements inserted at position 3.")
+is(resource:getvalue(), {'X.Y', 'A', 'B', 'C', 'C', 'B', 'A', '1.2'}, "Patch processed with 2 elements inserted at position 3.")
 resource:addpatchset("40", {{4, 0, {'D'}}})
-is(resource:getvalue(), "X.YABCDCBA1.2", "Patch processed with 2 elements inserted at position 4.")
+is(resource:getvalue(), {'X.Y', 'A', 'B', 'C', 'D', 'C', 'B', 'A', '1.2'}, "Patch processed with 2 elements inserted at position 4.")
 resource:addpatchset("50", {{1, 0, {}}})
-is(resource:getvalue(), "X.YABCDCBA1.2", "Patch processed with no deletes and no additions.")
+is(resource:getvalue(), {'X.Y', 'A', 'B', 'C', 'D', 'C', 'B', 'A', '1.2'}, "Patch processed with no deletes and no additions.")
 
 -- test deletes
 resource = sync9.createspace("0", {'X', '1', '2', '3'})
-is(resource:getvalue(), "X123", "Space created.")
+is(resource:getvalue(), {'X', '1', '2', '3'}, "Space created.")
 resource:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
-is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
+is(resource:getvalue(), {'X', 'A', 'B', 'C', 'D', '3'}, "Patchset processed with three patches with elements added and deleted.")
 resource:addpatchset("30", {{1, 1}})
 resource:addpatchset("31", {{1, 2, {}}})
 resource:addpatchset("32", {{1, 1, {''}}})
-is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
+is(resource:getvalue(), {'X', '3'}, "Patch processed with 4 elements deleted.")
 resource:addpatchset("40", {{0, 2, {'C', 'C'}}})
-is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
+is(resource:getvalue(), {'C', 'C'}, "Patch processed with 2 elements deleted and 2 added at position 0.")
 resource:addpatchset("50", {{1, 1, {'D'}}})
-is(resource:getvalue(), "CD", "Patch processed with 1 element deleted and added at the last element.")
+is(resource:getvalue(), {'C', 'D'}, "Patch processed with 1 element deleted and added at the last element.")
 
 -- test embedded shallow processing
 -- the content is managed as a string instead of a table
@@ -48,11 +48,11 @@ local shallowdata = setmetatable({[0] = "X123"}, {__index = {
     }})
 resource = sync9.createspace("0", shallowdata)
 is(resource:getvalue(), "X123", "Space created with shallow embedded data.")
-resource:addpatchset("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+resource:addpatchset("20", {{1, 2, 'A'}, {2, 0, 'BB'}, {3, 1, 'CD'}})
 is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
 resource:addpatchset("30", {{1, 4, {}}})
 is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
-resource:addpatchset("40", {{0, 2, {'C', 'C'}}})
+resource:addpatchset("40", {{0, 2, 'CC'}})
 is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 
 -- test external shallow processing
@@ -76,19 +76,19 @@ resource:sethandler{
       end
       if value and #value > 0 then
         table.insert(callbacks, {"ins", version, addidx, value})
-        str = str:sub(1, addidx)..table.concat(value,"")..str:sub(addidx+1)
+        str = str:sub(1, addidx)..value..str:sub(addidx+1)
       end
     end
   end,
 }
 is(resource:getvalue(), "X123", "Space created with shallow embedded data.")
-resource:addversion("20", {{1, 2, {'A'}}, {2, 0, {'B', 'B'}}, {3, 1, {'C', 'D'}}})
+resource:addversion("20", {{1, 2, 'A'}, {2, 0, 'BB'}, {3, 1, 'CD'}})
 is(resource:getvalue(), "XABCD3", "Patchset processed with three patches with elements added and deleted.")
-resource:addversion("30", {{1, 4, {}}})
+resource:addversion("30", {{1, 4, ""}})
 is(resource:getvalue(), "X3", "Patch processed with 4 elements deleted.")
 -- check that the last and the previous patches are deletes (no inserts added for the last patch)
 is(#callbacks > 1 and callbacks[#callbacks-1][1] and callbacks[#callbacks][1], "del", "Patch with delete doesn't trigger insert callback.")
-resource:addversion("40", {{0, 2, {'C', 'C'}}})
+resource:addversion("40", {{0, 2, 'CC'}})
 is(resource:getvalue(), "CC", "Patch processed with 2 elements deleted and 2 added at position 0.")
 is(str, resource:getvalue(), "Direct comparison of external shallow data.")
 
@@ -127,28 +127,28 @@ ok(not p1:equals(p2), "Tables with different content are not equal.")
 
 -- test linear versioning for resources
 resource = sync9.createresource()
-resource:addversion("00", {{0, 0, {'X', '1'}}})
+resource:addversion("00", {{0, 0, 'X1'}})
 ok(resource:gettime("00"), "Resource version history is updated.")
 is(resource:getvalue(), "X1", "Resource created.")
-resource:addversion("20", {{1, 0, {'A', 'A'}}, {2, 0, {'B', 'B'}}})
+resource:addversion("20", {{1, 0, 'AA'}, {2, 0, 'BB'}})
 is(resource:getvalue(), "XABBA1", "Resource patchset processed with two patches inserted at different positions.")
-resource:addversion("30", {{3, 0, {'C', 'C'}}})
+resource:addversion("30", {{3, 0, 'CC'}})
 is(resource:getvalue(), "XABCCBA1", "Patch processed with 2 elements inserted at position 3.")
-resource:addversion("40", {{4, 0, {'D'}}})
+resource:addversion("40", {{4, 0, 'D'}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
-resource:addversion("50", {{1, 0, {}}})
+resource:addversion("50", {{1, 0, ""}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
 ok(resource:gettime("50") and resource:gettime("50")["40"], "Resource version history is updated with the parent version.")
 
 -- test branching versioning for resources
 resource = sync9.createresource()
-resource:addversion("v00", {{0, 0, {'X', '1'}}})
+resource:addversion("v00", {{0, 0, 'X1'}})
 is(resource:getvalue(), "X1", "Resource created.")
-resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
+resource:addversion("v20", {{1, 0, 'AA'}}, {v00 = true})
 is(resource:getvalue(), "XAA1", "Resource patch processed with explicit parent.")
-resource:addversion("v10", {{1, 0, {'B'}}}, {v00 = true})
+resource:addversion("v10", {{1, 0, 'B'}}, {v00 = true})
 is(resource:getvalue(), "XBAA1", "Resource patch processed with a branching parent inserted earlier based on version number.")
-resource:addversion("v30", {{3, 0, {'C'}}}, {v10 = true, v20 = true})
+resource:addversion("v30", {{3, 0, 'C'}}, {v10 = true, v20 = true})
 is(resource:getvalue(), "XBACA1", "Resource patch processed with a branching parent inserted later based on version number.")
 resource:addversion("v40", {{1, 4}}, {v30 = true})
 is(resource:getvalue(), "X1", "Resource patch processed with a delete.")
@@ -167,11 +167,11 @@ ancestors = resource:getancestors({v10 = true})
 ok(ancestors.v10 and ancestors.v00, "Ancestor by version returns all ancestors (2/2).")
 
 -- test direct resource initialization
-resource = sync9.createresource("v00", {'X', '1'})
+resource = sync9.createresource("v00", 'X1')
 is(resource:getvalue(), "X1", "Resource created with initialization value.")
 
 -- test branching addition and deletion
-resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
+resource:addversion("v20", {{1, 0, 'AA'}}, {v00 = true})
 is(resource:getvalue(), "XAA1", "Resource patch processed with explicit parent insert first (1/4).")
 resource:addversion("v10", {{0, 2}}, {v00 = true})
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent insert first (2/4).")
@@ -179,7 +179,7 @@ is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit par
 is(resource:getvalue(), "AA", "Resource patch processed with explicit parent insert first (4/4).")
 
 -- test branching deletion and addition
-resource = sync9.createresource("v00", {'X', '1'})
+resource = sync9.createresource("v00", "X1")
 callbacks = {}
 resource:sethandler{
   version = function(_, version) table.insert(callbacks, version) end,
@@ -187,32 +187,32 @@ resource:sethandler{
 is(resource:getvalue(), "X1", "Resource created with initialization value.")
 resource:addversion("v10", {{0, 2}}, {v00 = true})
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (1/4).")
-resource:addversion("v20", {{1, 0, {'A', 'A'}}}, {v00 = true})
+resource:addversion("v20", {{1, 0, "AA"}}, {v00 = true})
 is(resource:getvalue("v20"), "XAA1", "Resource patch processed with explicit parent delete first (2/4).")
 is(resource:getvalue("v10"), "", "Resource patch processed with explicit parent delete first (3/4).")
 is(resource:getvalue(), "AA", "Resource patch processed with explicit parent delete first (4/4).")
 
 -- test patchsets generated "as of" their own version (should be the same as the original patchset)
-is(resource:getpatchset("v00", {v00 = true}), {{0, 0, {'X'}}, {1, 0, {'1'}}},
+is(resource:getpatchset("v00", {v00 = true}), {{0, 0, 'X'}, {1, 0, '1'}},
   "Resource patchset for its own version has expected patches (1/3).")
 is(resource:getpatchset("v10", {v10 = true}), {{0, 1}, {0, 1}},
   "Resource patchset for its own version has expected patches (2/3).")
-is(resource:getpatchset("v20", {v20 = true}), {{1, 0, {'A', 'A'}}},
+is(resource:getpatchset("v20", {v20 = true}), {{1, 0, "AA"}},
   "Resource patchset for its own version has expected patches (3/3).")
 
 is(callbacks[1], "v10", "Resource callback reports expected version (1/2).")
 is(callbacks[2], "v20", "Resource callback reports expected version (2/2).")
 
 -- test patchsets generated "as of" the current version ("rebase" the patchset)
-is(resource:getpatchset("v00"), {{0, 0, {'X'}}, {2, 0, {'1'}}},
+is(resource:getpatchset("v00"), {{0, 0, 'X'}, {2, 0, '1'}},
   "Resource patchset for the current version has expected patches (1/3).")
 is(resource:getpatchset("v10"), {{0, 1}, {2, 1}}, "Resource patchset for the current version has expected patches (2/3).")
-is(resource:getpatchset("v20"), {{0, 0, {'A', 'A'}}}, "Resource patchset for the current version has expected patches (3/3).")
+is(resource:getpatchset("v20"), {{0, 0, "AA"}}, "Resource patchset for the current version has expected patches (3/3).")
 
 -- test branching replacement and overlapping deletion
-resource = sync9.createresource("v00", {'X', '1', '2', '3', '4', '5', '6', '7'})
+resource = sync9.createresource("v00", "X1234567")
 
-resource:addversion("v10", {{2, 2, {'A'}}}, {v00 = true})
+resource:addversion("v10", {{2, 2, "A"}}, {v00 = true})
 is(resource:getvalue("v10"), "X1A4567", "Resource patch processed with overlapping deletes (1/4).")
 resource:addversion("v20", {{1, 6}}, {v00 = true})
 is(resource:getvalue("v20"), "X7", "Resource patch processed with overlapping deletes (2/4).")
@@ -220,7 +220,7 @@ is(resource:getvalue("v10"), "X1A4567", "Resource patch processed with overlappi
 is(resource:getvalue(), "XA7", "Resource patch processed with overlapping deletes (4/4).")
 
 -- test patchsets generated "as of" the current version ("rebase" the patchset)
-is(resource:getpatchset("v10"), {{1, 0, {'A'}}}, "Resource patchset for the current version has expected patches (1/2).")
+is(resource:getpatchset("v10"), {{1, 0, 'A'}}, "Resource patchset for the current version has expected patches (1/2).")
 is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the current version has expected patches (2/2).")
 
 callbacks = {}

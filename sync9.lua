@@ -450,7 +450,7 @@ function M.createresource(version, elem)
   return setmetatable({
       -- create root node
       space = M.createspace(version, elem),
-      time = {},
+      time = {[version] = {}},
       futureparents = setmetatable({[version] = true}, metaparents),
       }, metaresource)
 end

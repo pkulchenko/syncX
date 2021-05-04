@@ -223,12 +223,17 @@ is(resource:getvalue(), "XA7", "Resource patch processed with overlapping delete
 is(resource:getpatchset("v10"), {{1, 0, 'A'}}, "Resource patchset for the current version has expected patches (1/2).")
 is(resource:getpatchset("v20"), {{1, 1}, {2, 3}}, "Resource patchset for the current version has expected patches (2/2).")
 
+-- merge the two branches together
+resource:addversion("v30", {{0, 0, ""}}, {v20 = true, v10 = true})
+
 callbacks = {}
 resource:walkgraph(function(args)
     table.insert(callbacks, {args.version, args.value, args.level, args.offset, args.isdeleted, args.isnode})
   end)
 is(callbacks, {
-    {"v00", "X", 1, 0, false, true},
+    {"v00", "", 1, 0, true, true},
+    {"v30", "", 2, 0, false, true},
+    {"v00", "X", 1, 0, false, false},
     {"v00", "1", 1, 1, true, false},
     {"v10", "A", 2, 1, false, true},
     {"v00", "23", 1, 2, true, false},

@@ -241,6 +241,15 @@ is(callbacks, {
     {"v00", "7", 1, 2, false, false},
     }, "Calling walkgraph produces expected callbacks.")
 
+resource:prune()
+is(resource:getvalue(), "XA7", "Node value stays the same after pruning.")
+
+callbacks = {}
+resource:walkgraph(function(args)
+    table.insert(callbacks, {args.version, args.value, args.level, args.offset, args.isdeleted, args.isnode})
+  end)
+is(callbacks, {{"v30", "XA7", 1, 0, false, true}}, "Pruning leaves only one node.")
+
 -- test linear versioning for string-based resources
 resource = sync9.createresource("v00", "")
 resource:addversion("v10", {{0, 0, 'X1'}})

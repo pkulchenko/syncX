@@ -34,14 +34,14 @@ local function getgraph(resource)
     table.insert(callbacks, table.concat({args.version, args.value, args.level, args.offset,
           args.isdeleted and "t" or "f", args.isnode and "t" or "f"}, "-"))
   end)
-  return table.concat(callbacks, ";")
+  return table.concat(callbacks, ";"), #callbacks
 end
 
 local seed = math.random(10000)
 math.randomseed(seed)
 
-for i = 1, 2000 do
-  if i % 200 == 0 then
+for i = 1, 5000 do
+  if i % 1000 == 0 then
     local nodecnt = 0
     docsyncs[1]:walkgraph(function() nodecnt = nodecnt + 1 end)
     print(("%d: value length = %s; graph node count = %s"):format(i, #docsyncs[1]:getvalue(), nodecnt))
@@ -82,17 +82,28 @@ for i = 1, 2000 do
   for i = 1, #patches do pendingcnt = pendingcnt + #patches[i] end
   if pendingcnt == 0 then
     local value = docsyncs[1]:getvalue()
-    local graph = getgraph(docsyncs[1])
+    local graph, num = getgraph(docsyncs[1])
     for i = 2, #patches do
-      if value ~= docsyncs[i]:getvalue() then
-        print(("Failed value comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
-            i, seed, value, i, docsyncs[i]:getvalue()))
-        os.exit()
-      end
-      if graph ~= getgraph(docsyncs[i]) then
-        print(("Failed graph comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
-            i, seed, graph, i, getgraph(docsyncs[i])))
-        os.exit()
+      assert(value == docsyncs[i]:getvalue(),
+        ("Failed value comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
+          i, seed, value, i, docsyncs[i]:getvalue()))
+      assert(graph == getgraph(docsyncs[i]),
+        ("Failed graph comparison %s (seed=%d)\n1=%s\n%d=%s\n"):format(
+          i, seed, graph, i, getgraph(docsyncs[i])))
+    end
+    -- prune all histories and compare again
+    for i = 1, #patches do
+      docsyncs[i]:prune()
+      assert(value == docsyncs[i]:getvalue(),
+        ("Failed value comparison after pruning %s (seed=%d)\nexpected=%s\nreceived=%s\n"):format(
+          i, seed, value, docsyncs[i]:getvalue()))
+      local parents = docsyncs[i]:getparents()
+      -- if there is a single parent on top, everything has been pruned
+      if not next(parents, next(parents)) then
+        local pgraph, pnum = getgraph(docsyncs[i])
+        assert(pnum == 1,
+          ("Failed history pruning %s (seed=%d)\nexpected=%s\nreceived=%s (%s)\n"):format(
+            i, seed, 1, pnum, pgraph))
       end
     end
   end

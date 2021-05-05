@@ -15,6 +15,7 @@ for i = 1, 5000 do
   if i % 1000 == 0 then
     local nodecnt = 0
     docsync:walkgraph(function(args) nodecnt = nodecnt + 1 end)
+    docsync:prune()
     print(("%d: value length = %s; graph node count = %s"):format(i, #docraw, nodecnt))
   end
 
@@ -29,8 +30,6 @@ for i = 1, 5000 do
     docsync:addversion(i, {{pos, length}})
   end
 
-  if docsync:getvalue() ~= docraw then
-    print(("Failed test %s (seed=%d)\nexpected %s\nreceived %s\n"):format(i, seed, docsync:getvalue(), docraw))
-    os.exit()
-  end
+  assert(docsync:getvalue() == docraw,
+    ("Failed test %s (seed=%d)\nexpected %s\nreceived %s\n"):format(i, seed, docsync:getvalue(), docraw))
 end

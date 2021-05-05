@@ -96,38 +96,43 @@ end
 
 local function getnewversion(editor)
   editor.version = editor.version + 1
+  if editor.version == 1 then
+    -- start all editors from the same version, as this simplifies pruning
+    return ("v%x_%x"):format(editor.version, 100)
+  end
   return ("v%x_%x"):format(editor.version, editor:GetId())
+end
+
+local function showgraph(editor)
+  -- update the graph representation
+  editor.graph:SetReadOnly(false)
+  editor.graph:ClearAll()
+  editor.sync:walkgraph(function(args)
+      local greditor = editor.graph
+      local pos = greditor:GetLength()
+      local text = ("%s%s: %q\n"):format((" "):rep(args.level), args.version, args.value:gsub("\n","\013"))
+      greditor:AppendText(text)
+      -- set the indicator for deleted nodes
+      if args.isdeleted then
+        greditor:SetIndicatorCurrent(greditor.indicator)
+        greditor:IndicatorFillRange(pos+args.level, #text-args.level)
+      end
+      -- each line has a new line and first index is 0, so the last added line is total-2
+      local lineidx = greditor:GetLineCount()-2
+      local level = args.level + wxstc.wxSTC_FOLDLEVELBASE
+      -- if the previous line has a different level, then make it a header
+      if lineidx > 0 and greditor:GetFoldLevel(lineidx-1) < level then
+        -- decrease the level on the previous one comparing to the current one
+        greditor:SetFoldLevel(lineidx-1, level - 1 + wxstc.wxSTC_FOLDLEVELHEADERFLAG)
+      end
+      greditor:SetFoldLevel(lineidx, level)
+    end)
+  editor.graph:SetReadOnly(true)
 end
 
 -- setup syncX structures to keep track of editor changes
 local function setsync(editor)
   local sync9 = require "sync9"
-  local function showgraph(editor)
-    -- update the graph representation
-    editor.graph:SetReadOnly(false)
-    editor.graph:ClearAll()
-    editor.sync:walkgraph(function(args)
-        local greditor = editor.graph
-        local pos = greditor:GetLength()
-        local text = ("%s%s: %q\n"):format((" "):rep(args.level), args.version, args.value:gsub("\n","\013"))
-        greditor:AppendText(text)
-        -- set the indicator for deleted nodes
-        if args.isdeleted then
-          greditor:SetIndicatorCurrent(greditor.indicator)
-          greditor:IndicatorFillRange(pos+args.level, #text-args.level)
-        end
-        -- each line has a new line and first index is 0, so the last added line is total-2
-        local lineidx = greditor:GetLineCount()-2
-        local level = args.level + wxstc.wxSTC_FOLDLEVELBASE
-        -- if the previous line has a different level, then make it a header
-        if lineidx > 0 and greditor:GetFoldLevel(lineidx-1) < level then
-          -- decrease the level on the previous one comparing to the current one
-          greditor:SetFoldLevel(lineidx-1, level - 1 + wxstc.wxSTC_FOLDLEVELHEADERFLAG)
-        end
-        greditor:SetFoldLevel(lineidx, level)
-      end)
-    editor.graph:SetReadOnly(true)
-  end
   local resource = sync9.createresource(getnewversion(editor), editor:GetText())
   resource:sethandler {
     version = function(resource, version)
@@ -206,6 +211,14 @@ local function logclicked(event)
   log:SetReadOnly(true)
   local patch, parents = (loadstring or load)("return "..patchstr..", "..parentstr)()
   log.sync:addversion(version, {patch}, parents)
+
+  -- check if both logs are empty and purge both histories
+  if editors.log1:GetText() == "" and editors.log2:GetText() == "" then
+    for ed in pairs({editor1 = true, editor2 = true}) do
+      editors[ed].sync:prune()
+      showgraph(editors[ed])
+    end
+  end
 end
 editors.log1:Connect(wxstc.wxEVT_STC_MARGINCLICK, logclicked)
 editors.log2:Connect(wxstc.wxEVT_STC_MARGINCLICK, logclicked)

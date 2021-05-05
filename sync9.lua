@@ -56,6 +56,13 @@ local function any(tbl, condition)
   return false
 end
 
+local function all(tbl, condition)
+  for k, v in pairs(tbl) do
+    if not condition(k,v) then return false end
+  end
+  return true
+end
+
 if not table.unpack then table.unpack = unpack end
 
 -- traverse space graph starting from `node` and calling `callback` for each part
@@ -84,19 +91,28 @@ local metaparts = {__index = {
     splice = splice,
     slice = function(...) return {table.unpack(...)} end,
     spliceinto = spliceinto, -- insert in the appropriate slot based on binary search by version
-    any = any, -- return `true` if any of the values match condition
+    any = any, -- return `true` if **any** of the values match condition
+    all = all, -- return `true` if **all** of the values match condition
     copy = copy,
   }}
 -- metatable to handle elements as a table
 local metatblelems = {__index = {
-    slice = function(...) return {table.unpack(...)} end,
+    slice = function(tbl, ...)
+      return setmetatable({table.unpack(tbl, ...)}, getmetatable(tbl))
+    end,
+    concat = function(tbl, tbladd) splice(tbl, #tbl+1, 0, tbladd) end,
     getlength = function(tbl) return #tbl end,
     getvalue = function(tbl) return tbl end,
     copy = copy,
   }}
 -- metatable to handle elements as a string
 local metastrelems = {__index = {
-    slice = function(tbl, ...) return {[0] = tbl[0]:sub(...)} end,
+    slice = function(tbl, ...)
+      return setmetatable({[0] = tbl[0]:sub(...)}, getmetatable(tbl))
+    end,
+    concat = function(tbl, str)
+      tbl[0] = tbl[0]..(type(str) == "string" and str or str[0])
+    end,
     getlength = function(tbl) return #tbl[0] end,
     getvalue = function(tbl) return tbl[0] end,
     copy = function(tbl) return tbl[0] end,
@@ -329,6 +345,7 @@ end
 
 local metaparents = {__index = {
     copy = copy,
+    all = all, -- return `true` if all of the values match condition
     equals = function(tbl1, tbl2)
       if #tbl1 ~= #tbl2 then return false end
       local val1, val2, key1, key2
@@ -349,6 +366,176 @@ local metaparents = {__index = {
       return true
     end,
   }}
+
+local function prune(resource, keeplist)
+  if not keeplist then keeplist = {} end
+  local children = setmetatable({}, metaparents)
+  -- populate children versions based on the parent versions available
+  for version, parents in pairs(resource.time) do
+    for parent in pairs(parents) do
+      if not children[parent] then children[parent] = {} end
+      children[parent][version] = true
+    end
+  end
+
+  -- to prune we need to find "bubbles" in the dag,
+  -- with a "bottom" and "top" version,
+  -- where any path down from the top will hit the bottom,
+  -- and any path up from the bottom will hit the top.
+  -- Dag grows top-down, so the oldest (parent) versions are on top.
+  -- Also, the bubble should not contain any versions on the `keeplist`
+  -- (unless it's the bottom)
+
+  -- compute the bubbles
+  local bubbles = {}
+  local tops = {}
+  local bottoms = {}
+
+  local function markbubble(bottom, top, tag)
+    if not bubbles[bottom] then
+      bubbles[bottom] = tag
+      if bottom ~= top then
+        for parent in pairs(resource.time[bottom]) do
+          markbubble(parent, top, tag)
+        end
+      end
+    end
+  end
+
+  local function findbubble(cur)
+    local seen = {[cur] = true}
+    local q = {}
+    local expecting = {}
+    for parent in pairs(resource.time[cur]) do
+      table.insert(q, parent)
+      expecting[parent] = true
+    end
+    while #q > 0 do
+      cur = table.remove(q)
+      if not resource.time[cur] then return end
+      if keeplist[cur] then return end
+      if children.all(children[cur], function(c) return seen[c] end) then
+        seen[cur] = true
+        expecting[cur] = nil
+        if not next(expecting) then return cur end
+        for parent in pairs(resource.time[cur]) do
+          table.insert(q, parent)
+          expecting[parent] = true
+        end
+      end
+    end
+  end
+
+  local done = {}
+  local function f(cur)
+    -- skip unknown versions
+    if not resource.time[cur] then return end
+    if done[cur] then return end
+    done[cur] = true
+
+    if not bubbles[cur] or tops[cur] then
+      local top = findbubble(cur)
+      if top then
+        bubbles[cur] = nil
+        markbubble(cur, top, tops[cur] or cur)
+        tops[top] = tops[cur] or cur
+        bottoms[tops[cur] or cur] = top
+      end
+    end
+    for parent in pairs(resource.time[cur]) do f(parent) end
+  end
+
+  for parent in pairs(resource:getparents()) do f(parent) end
+
+  local function space_dag_prune(node)
+    local isasc = function() return true end
+    traverse_space_dag(node, isasc, function(node)
+        local replacement = bubbles[node.version]
+        if (replacement and replacement ~= node.version) then
+          node.version = replacement
+        end
+
+        for version in pairs(node.deletedby) do
+          if bubbles[version] then
+            -- if the node is deleted by a pruned version,
+            -- replace the reference with its replacement
+            node.deletedby[version] = nil
+            node.deletedby[bubbles[version]] = true
+          end
+        end
+      end)
+
+    -- assign the next element at the very end of the `line` of elements
+    local function setnextnode(node, nextnode)
+      while (node.parts[0]) do node = node.parts[0] end
+      node.parts[0] = nextnode
+    end
+
+    -- `line` is a sequence of nodes connected together with next (`parts[0]`) references
+    -- this method combines the entire line into one node under cetrain conditions
+    local function doline(node)
+      local version = node.version
+      local prev
+      while node do repeat -- use `repeat` to emulate `continue` with `break` statement
+        -- only check the first version, as all parts are expected to have the same version
+        if node.parts[1] and node.parts[1].version == version then
+          for i = 1, #node.parts do
+            setnextnode(node.parts[i], i < #node.parts and node.parts[i + 1] or node.parts[0])
+          end
+          node.parts[0] = node.parts[1]
+          node.parts:splice(1, #node.parts) -- remove all parts, as they have been consolidated
+        end
+
+        -- if the node is deleted by the current version,
+        -- empty the number of elements, as it's unreachable
+        if node.deletedby[version] then
+          local dummy = create_space_dag_node(node.version, node.elems:slice(1,0))
+          node.elems = dummy.elems
+          node.deletedby = dummy.deletedby
+          if prev then
+            node = prev
+            break -- continue
+          end
+        end
+
+        local nextnode = node.parts[0]
+
+        if (#node.parts == 0 and nextnode
+          -- no elements in this node or the next node
+          and (node.elems:getlength() == 0 or nextnode.elems:getlength() == 0
+            -- both this and next node have the same `deletedby` list of versions
+            or (node.deletedby:all(function(x) return nextnode.deletedby[x] end)
+              and nextnode.deletedby:all(function(x) return node.deletedby[x] end)))) then
+          -- empty nodes are treated the same way as deleted nodes
+          if node.elems:getlength() == 0 then node.deletedby = nextnode.deletedby end
+          node.elems:concat(nextnode.elems)
+          node.parts = nextnode.parts
+          break -- continue
+        end
+
+        for _, node in ipairs(node.parts) do doline(node) end
+
+        prev = node
+        node = nextnode
+      until not node end
+    end
+
+    doline(node)
+  end
+
+  space_dag_prune(resource.space)
+
+  for prunedversion, replacement in pairs(bubbles) do
+    if prunedversion == bottoms[replacement] then
+      -- connect the newest (bottom) version to the parents of the oldest (top) pruned version
+      resource.time[replacement] = resource.time[prunedversion]
+    end
+    if prunedversion ~= replacement then
+      -- remove all pruned versions from history
+      resource.time[prunedversion] = nil
+    end
+  end
+end
 
 local M = {
   createspace = create_space_dag_node,
@@ -437,6 +624,7 @@ function M.createresource(version, elem)
         traverse_space_dag(resource:getspace(), isanc, process_patch)
         return patchset
       end,
+      prune = prune,
       sethandler = function(node, handlers)
         local mt = getmetatable(node)
         if not mt or not mt.__index then return end

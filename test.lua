@@ -264,3 +264,11 @@ resource:addversion("v40", {{4, 0, 'D'}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with 2 elements inserted at position 4.")
 resource:addversion("v50", {{1, 0, ""}})
 is(resource:getvalue(), "XABCDCBA1", "Patch processed with no deletes and no additions.")
+
+-- test pruning of selected versions
+-- prune everything between v00 and v40
+resource:prune({v00 = true}, {v40 = true})
+is(resource.time.v00, {}, "Prune selected versions (1/4).")
+is(resource.time.v40, {v00 = true}, "Prune selected versions (2/4).")
+is(resource.time.v50, {v40 = true}, "Prune selected versions (3/4).")
+is(resource:getvalue(), "XABCDCBA1", "Prune selected versions (4/4).")

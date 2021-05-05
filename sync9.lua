@@ -367,10 +367,12 @@ local metaparents = {__index = {
     end,
   }}
 
-local function prune(resource, keeplist)
+local function prune(resource, keeplist, startlist)
   if not keeplist then keeplist = {} end
-  local children = setmetatable({}, metaparents)
+  if not startlist then startlist = resource:getparents() end
+
   -- populate children versions based on the parent versions available
+  local children = setmetatable({}, metaparents)
   for version, parents in pairs(resource.time) do
     for parent in pairs(parents) do
       if not children[parent] then children[parent] = {} end
@@ -445,7 +447,7 @@ local function prune(resource, keeplist)
     for parent in pairs(resource.time[cur]) do f(parent) end
   end
 
-  for parent in pairs(resource:getparents()) do f(parent) end
+  for parent in pairs(startlist) do f(parent) end
 
   local function space_dag_prune(node)
     local isasc = function() return true end

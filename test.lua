@@ -272,3 +272,56 @@ is(resource.time.v00, {}, "Prune selected versions (1/4).")
 is(resource.time.v40, {v00 = true}, "Prune selected versions (2/4).")
 is(resource.time.v50, {v40 = true}, "Prune selected versions (3/4).")
 is(resource:getvalue(), "XABCDCBA1", "Prune selected versions (4/4).")
+
+-- test cases from [CRDT puzzles page](https://braid.org/crdt/puzzles) as of 2021-May-5
+resource = sync9.createresource("v00", "")
+resource:addversion("a10", {{0, 0, 'hello'}}, {v00 = true})
+resource:addversion("b10", {{0, 0, 'world'}}, {v00 = true})
+resource:addversion("c10", {{0, 0, ''}}, {a10 = true, b10 = true})
+-- `helloworld` based on comparison between a10 and b10
+is(resource:getvalue(), "helloworld", "CRDT puzzles test (1/5).")
+
+resource = sync9.createresource("v00", "")
+-- A prepends AAA (one character at a time)
+resource:addversion("a10", {{0, 0, 'A'}}, {v00 = true})
+resource:addversion("a20", {{0, 0, 'A'}}, {a10 = true})
+resource:addversion("a30", {{0, 0, 'A'}}, {a20 = true})
+-- B prepends BBB (one character at a time)
+resource:addversion("b10", {{0, 0, 'B'}}, {v00 = true})
+resource:addversion("b20", {{0, 0, 'B'}}, {b10 = true})
+resource:addversion("b30", {{0, 0, 'B'}}, {b20 = true})
+-- versions from A and B are merged together
+resource:addversion("c10", {{0, 0, ''}}, {a30 = true, b30 = true})
+-- `AAABBB` based on comparison between a10 and b10
+is(resource:getvalue(), "AAABBB", "CRDT puzzles test (2/5).")
+
+resource = sync9.createresource("v00", "")
+-- A and B insert "A" and "B" respectively
+resource:addversion("a10", {{0, 0, 'A'}}, {v00 = true})
+resource:addversion("b10", {{0, 0, 'B'}}, {v00 = true})
+-- C merges changes from A and B, and inserts C in between their edits
+resource:addversion("c10", {{1, 0, 'C'}}, {a10 = true, b10 = true})
+-- `ACB` depending on the order of a10 anc b10 (could also be `BCA`)
+is(resource:getvalue(), "ACB", "CRDT puzzles test (3/5).")
+-- A inserts "a1"
+resource:addversion("a20", {{1, 0, 'a1'}}, {a10 = true})
+-- B prepends "b0"
+resource:addversion("b20", {{0, 0, 'b0'}}, {b10 = true})
+-- C merges all the changes piecemeal; although "c10" is merged twice,
+-- it is still only included once in the result
+resource:addversion("c20", {{0, 0, ''}}, {a20 = true, c10 = true})
+resource:addversion("c30", {{0, 0, ''}}, {b20 = true, c10 = true})
+resource:addversion("c40", {{0, 0, ''}}, {c20 = true, c30 = true})
+is(resource:getvalue(), "Aa1Cb0B", "CRDT puzzles test (4/5).")
+
+resource = sync9.createresource("v00", "")
+-- A, B, C are inserted concurrently into an empty document
+resource:addversion("a10", {{0, 0, 'A'}}, {v00 = true})
+resource:addversion("b10", {{0, 0, 'B'}}, {v00 = true})
+resource:addversion("c10", {{0, 0, 'C'}}, {v00 = true})
+-- D merges changes from A and C and inserts D between
+resource:addversion("d10", {{1, 0, 'D'}}, {a10 = true, c10 = true})
+-- B merges all the changes
+resource:addversion("b20", {{0, 0, ''}}, {b10 = true, d10 = true})
+-- `ADBC` based on comparison between a10, b10 and c10
+is(resource:getvalue(), "ADBC", "CRDT puzzles test (5/5).")

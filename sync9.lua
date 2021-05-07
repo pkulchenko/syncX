@@ -371,6 +371,30 @@ local function prune(resource, keeplist, startlist)
   if not keeplist then keeplist = {} end
   if not startlist then startlist = resource:getparents() end
 
+  -- find the "root" version (the one without paretns) in the time dag
+  local root
+  for version, parents in pairs(resource.time) do
+    if not next(parents) then
+      root = version
+      break
+    end
+  end
+  assert(root) -- need to have root version
+  -- add "missing" references for all orphan versions
+  for _, parents in pairs(resource.time) do
+    for parent in pairs(parents) do
+      if not resource.time[parent] then
+        resource.time[parent] = {[root] = true}
+      end
+    end
+  end
+  -- also check the `startlist` for any orphan references
+  for parent in pairs(startlist) do
+    if not resource.time[parent] then
+      resource.time[parent] = {[root] = true}
+    end
+  end
+
   -- populate children versions based on the parent versions available
   local children = setmetatable({}, metaparents)
   for version, parents in pairs(resource.time) do
@@ -414,7 +438,7 @@ local function prune(resource, keeplist, startlist)
     end
     while #q > 0 do
       cur = table.remove(q)
-      if not resource.time[cur] then return end
+      assert(resource.time[cur])
       if keeplist[cur] then return end
       if children.all(children[cur], function(c) return seen[c] end) then
         seen[cur] = true
@@ -430,8 +454,7 @@ local function prune(resource, keeplist, startlist)
 
   local done = {}
   local function f(cur)
-    -- skip unknown versions
-    if not resource.time[cur] then return end
+    assert(resource.time[cur])
     if done[cur] then return end
     done[cur] = true
 

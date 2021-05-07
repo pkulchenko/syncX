@@ -274,6 +274,20 @@ is(resource.time.v40, {v00 = true}, "Prune selected versions (2/4).")
 is(resource.time.v50, {v40 = true}, "Prune selected versions (3/4).")
 is(resource:getvalue(), "XABCDCBA1", "Prune selected versions (4/4).")
 
+-- test pruning of unrelated versions
+resource = sync9.createresource("v00", "")
+resource:addversion("v10", {{0, 0, 'X'}})
+-- add a patch with a non-existing parent version
+resource:addversion("v20", {{0, 0, '1'}}, {vXX = true})
+resource:addversion("v30", {{0, 0, ''}}, {v20 = true, v10 = true})
+is(resource:getvalue(), "X1", "Prune unrelated versions (1/4).")
+resource:prune()
+is(resource:getvalue(), "X1", "Prune unrelated versions (2/4).")
+-- check that v30 is now the root version
+is(resource.time.v30, {}, "Prune unrelated versions (3/4).")
+-- check that v30 is the only version in the time graph
+is({next(resource.time)}, {"v30", {}}, "Prune unrelated versions (4/4).")
+
 -- test cases from [CRDT puzzles page](https://braid.org/crdt/puzzles) as of 2021-May-5
 local combinations = {
   {"a10", "b10", "helloworld"},

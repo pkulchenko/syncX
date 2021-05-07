@@ -96,10 +96,6 @@ end
 
 local function getnewversion(editor)
   editor.version = editor.version + 1
-  if editor.version == 1 then
-    -- start all editors from the same version, as this simplifies pruning
-    return ("v%x_%x"):format(editor.version, 100)
-  end
   return ("v%x_%x"):format(editor.version, editor:GetId())
 end
 

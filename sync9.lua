@@ -550,6 +550,7 @@ local function prune(resource, keeplist, startlist)
 
   space_dag_prune(resource.space)
 
+  -- update time graph with the version replacements
   for prunedversion, replacement in pairs(bubbles) do
     if prunedversion == bottoms[replacement] then
       -- connect the newest (bottom) version to the parents of the oldest (top) pruned version
@@ -559,6 +560,18 @@ local function prune(resource, keeplist, startlist)
       -- remove all pruned versions from history
       resource.time[prunedversion] = nil
     end
+  end
+
+  -- remove any references to pruned versions from `futureparents`
+  -- this normally shouldn't happen, but may happen if the orphan version
+  -- get pointed to the root version already present in `futureparents`,
+  -- in which case it may get pruned and needs to be removed.
+  local orphans = {}
+  for parent in pairs(resource.futureparents) do
+    if not resource.time[parent] then orphans[parent] = true end
+  end
+  for parent in pairs(orphans) do
+    resource.futureparents[parent] = nil
   end
 end
 

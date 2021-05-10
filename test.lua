@@ -4,15 +4,6 @@ local sync9 = require "sync9"
 local resource
 local unpack = table.unpack or unpack
 
--- test get/set methods
-resource = sync9.createspace("0", {'X', '1', '2', '3'})
-is(resource:getvalue(), {'X', '1', '2', '3'}, "Space created with expected value.")
-is(resource:getlength(), 4, "Space created with expected length.")
-resource:set(0, "0")
-is(resource:getvalue(), {'0', '1', '2', '3'}, "Set processed.")
-is(resource:get(0), "0", "Get processed (1/2).")
-is(resource:get(3), "3", "Get processed (2/2).")
-
 -- test inserts
 resource = sync9.createspace("0", {'X.Y', '1.2'})
 is(resource:getvalue(), {'X.Y', '1.2'}, "Space created.")

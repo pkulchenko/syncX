@@ -124,41 +124,6 @@ local function metafy(elems)
     or setmetatable(elems or {}, metatblelems))
 end
 
-local function space_dag_get(node, index, is_anc)
-  -- if index is not specified, then return elements
-  if not index then return node.elems end
-  -- index value is 0-based
-  local value
-  local offset = 0
-  traverse_space_dag(node, is_anc or function() return true end,
-    function(node)
-      if (index - offset < node.elems:getlength()) then
-        value = node.elems[index - offset + 1]
-        return false
-      end
-      offset = offset + node.elems:getlength()
-    end)
-  return value
-end
-
-local function space_dag_set(node, index, value, is_anc)
-  -- if index is not specified, then assign elements
-  if not index then
-    node.elems = metafy(value)
-    return
-  end
-  -- index value is 0-based
-  local offset = 0
-  traverse_space_dag(node, is_anc or function() return true end,
-    function(node)
-      if (index - offset < node.elems:getlength()) then
-        node.elems[index - offset + 1] = value
-        return false
-      end
-      offset = offset + node.elems:getlength()
-    end)
-end
-
 create_space_dag_node = function(version, elems, deletedby)
   assert(not elems or type(elems) == "table" or type(elems) == "string", "Unexpected elements type (not 'string' or 'table')")
   assert(not deletedby or type(deletedby) == "table")
@@ -211,8 +176,6 @@ create_space_dag_node = function(version, elems, deletedby)
             if callback(params) == false then return false end
           end)
       end,
-      get = space_dag_get,
-      set = space_dag_set,
     }}
 
   return setmetatable({

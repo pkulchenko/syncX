@@ -26,10 +26,7 @@ local function getid() id = id + 1 return id end
 local function createPane(name)
   local ed = wxstc.wxStyledTextCtrl(frame, getid(), wx.wxDefaultPosition, wx.wxSize(500, 400), wx.wxBORDER_NONE)
   local fontsize = 14
-  if name:find("editor") then -- editor-specific logic
-    ed:SetText("Editor text")
-    ed:EmptyUndoBuffer()
-  else
+  if not name:find("editor") then
     ed:SetReadOnly(true)
     fontsize = name:find("log") and 12 or 10
   end
@@ -128,11 +125,16 @@ end
 
 -- setup syncX structures to keep track of editor changes
 local function setsync(editor)
+  -- initialize the editor
+  local text = "Editor text"
+  editor:SetText(text)
+  editor:EmptyUndoBuffer()
+  -- initialize the sync
   local sync9 = require "sync9"
-  local resource = sync9.createresource(getnewversion(editor), editor:GetText())
+  local resource = sync9.createresource(getnewversion(editor), text)
   resource:sethandler {
     version = function(resource, version)
-      local origin = tonumber(version:match("_(.+)"), 16)
+      local origin = tonumber(version:match("_(.+)") or 0, 16)
       for _, patch in ipairs(resource:getpatchset(version)) do
         local addidx, delcnt, value = unpack(patch)
         if editor:GetId() ~= origin then -- remote update, apply the changes
@@ -152,6 +154,9 @@ local function setsync(editor)
     end,
   }
   editor.sync = resource
+  -- add here any custom initialization to display
+  -- for example, `resource:addversion("v1", {{0, 15, 'New text'}})`
+  -- show the current space graph
   showgraph(editor)
 end
 

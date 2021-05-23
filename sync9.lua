@@ -154,7 +154,7 @@ create_space_dag_node = function(version, elems, deletedby)
               -- (in case the initial empty value is of a "wrong" type,
               -- for example, an empty table instead of an empty string)
               vtype = #values > 0 and vtype or type(value)
-              if vtype ~= type(value) then error("Inconsistent value types") end
+              if vtype ~= type(value) then error("Inconsistent value types", 2) end
               splice(values, #values+1, 0, table.unpack(vtype ~= "table" and {value} or value))
             end
           end)

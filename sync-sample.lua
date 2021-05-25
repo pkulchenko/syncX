@@ -18,8 +18,10 @@ frame:Connect(wx.wxEVT_IDLE, function() if #onidle > 0 then table.remove(onidle,
 -- describe two editors to have content and two to host the logs
 local editors = { editor1 = true, editor2 = true, log1 = true, log2 = true, graph1 = true, graph2 = true }
 local indicators = {
-  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(0, 150, 0)}, editor1 = 1, editor2 = 1,
-  {wxstc.wxSTC_INDIC_STRIKE, wx.wxColour(200, 0, 0)}, graph1 = 2, graph2 = 2,
+  {wxstc.wxSTC_INDIC_ROUNDBOX, wx.wxColour(0, 150, 0)}, addtext = 1,
+  {wxstc.wxSTC_INDIC_POINT, wx.wxColour(0, 0, 150)}, othercursor = 2,
+  {wxstc.wxSTC_INDIC_FULLBOX, wx.wxColour(0, 0, 150)}, otherselection = 3,
+  {wxstc.wxSTC_INDIC_STRIKE, wx.wxColour(200, 0, 0)}, delnode = 4,
 }
 local id = 100
 local function getid() id = id + 1 return id end
@@ -63,11 +65,12 @@ local function createPane(name)
   end
 
   -- set indicator for the current editor
-  ed.indicator = indicators[name]
-  if ed.indicator then
-    local itype, icolor = unpack(indicators[ed.indicator])
-    ed:IndicatorSetStyle(ed.indicator, itype)
-    ed:IndicatorSetForeground(ed.indicator, icolor)
+  for name, index in pairs(indicators) do
+    if type(index) == "number" then
+      local itype, icolor = unpack(indicators[index])
+      ed:IndicatorSetStyle(index, itype)
+      ed:IndicatorSetForeground(index, icolor)
+    end
   end
 
   local pi = wxaui.wxAuiPaneInfo():
@@ -107,7 +110,7 @@ local function showgraph(editor)
       greditor:AppendText(text)
       -- set the indicator for deleted nodes
       if args.isdeleted then
-        greditor:SetIndicatorCurrent(greditor.indicator)
+        greditor:SetIndicatorCurrent(indicators.delnode)
         greditor:IndicatorFillRange(pos+args.level, #text-args.level)
       end
       -- each line has a new line and first index is 0, so the last added line is total-2
@@ -144,7 +147,7 @@ local function setsync(editor)
           editor:SetTargetRange(addidx, addidx+delcnt)
           editor:ReplaceTarget(value or "")
           -- add modification indicator
-          editor:SetIndicatorCurrent(editor.indicator)
+          editor:SetIndicatorCurrent(indicators.addtext)
           editor:IndicatorFillRange(addidx, value and #value or 0)
           editor:SetEvtHandlerEnabled(true)
         end
@@ -185,7 +188,7 @@ local function editormodified(event)
   local text = event:GetText()
   if inserted then
     -- color added text with the default color
-    editor:SetIndicatorCurrent(editor.indicator)
+    editor:SetIndicatorCurrent(indicators.addtext)
     editor:IndicatorClearRange(pos, length)
   end
 
@@ -227,6 +230,43 @@ editors.log2:Connect(wxstc.wxEVT_STC_MARGINCLICK, logclicked)
 local function synconidle(event) if statusbar:GetStatusText(0) == autosync.on then logclicked(event) end end
 editors.log1:Connect(wx.wxEVT_IDLE, synconidle)
 editors.log2:Connect(wx.wxEVT_IDLE, synconidle)
+
+local cabinet = require "cabinet"
+editors.editor1.cab = cabinet.publish("editor1")
+editors.editor2.cab = cabinet.publish("editor2")
+local function editorupdateui(event)
+  if event:GetUpdated() ~= wxstc.wxSTC_UPDATE_SELECTION then return end
+  local editor = event:GetEventObject():DynamicCast("wxStyledTextCtrl")
+  editor.cab.cursor = editor:GetAnchor()
+  editor.cab.sels = editor:GetSelectionStart()
+  editor.cab.sele = editor:GetSelectionEnd()
+end
+editors.editor1:Connect(wxstc.wxEVT_STC_UPDATEUI, editorupdateui)
+editors.editor2:Connect(wxstc.wxEVT_STC_UPDATEUI, editorupdateui)
+
+local function updateeditor(ed)
+  local function update(t, key)
+    if key == "cursor" then
+      ed:SetIndicatorCurrent(indicators.othercursor)
+      ed:IndicatorClearRange(0, ed:GetLength())
+      ed:IndicatorFillRange(t.cursor, 1)
+    else
+      ed:SetIndicatorCurrent(indicators.otherselection)
+      ed:IndicatorClearRange(0, ed:GetLength())
+      if t.sels and t.sele then
+        -- selection can be done left to right or right to left,
+        -- but indicators are drawn only left to right,
+        -- so reverse the selection if needed
+        local sels = math.min(t.sels, t.sele)
+        local sele = math.max(t.sels, t.sele)
+        ed:IndicatorFillRange(sels, sele-sels)
+      end
+    end
+  end
+  return update
+end
+cabinet.subscribe("editor1", updateeditor(editors.editor2))
+cabinet.subscribe("editor2", updateeditor(editors.editor1))
 
 statusbar:Connect(wx.wxEVT_LEFT_DOWN, function ()
     statusbar:SetStatusText(statusbar:GetStatusText(0) == autosync.on and autosync.off or autosync.on, 0)

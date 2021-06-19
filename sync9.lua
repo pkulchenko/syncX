@@ -625,6 +625,40 @@ function M.createresource(version, elem)
         traverse_space_dag(resource:getspace(), isanc, process_patch)
         return patchset
       end,
+      -- remap index as of a particular `version` to the current `versions`
+      getindex = function(resource, version, index, versions)
+        -- if the question is about one of the "current" versions,
+        -- then no remapping calculations need to be done
+        if (versions or resource.futureparents)[version] then return index end
+        local ancestors = resource:getancestors(versions or resource.futureparents)
+        local isanc = function(nodeversion) return ancestors[nodeversion] end
+        -- assign ancestors and offset for the specified ("old") version
+        local ancvers = resource:getancestors({[version] = true})
+        local isver = function(nodeversion) return ancvers[nodeversion] end
+        local offver = 0
+        local delcnt = 0
+        local indnew
+        local function process_patch(node, nodeversion, deleted, offset)
+          -- this is the node that is known by `version`
+          if ancvers[nodeversion] then
+            local nodelen = node.elems:getlength()
+            if not node.deletedby:any(isver) then
+              offver = offver + nodelen
+              if index <= offver then
+                -- index may point to some offset inside the node,
+                -- so `index - (offver - nodelen)` calculates the difference,
+                -- which is then added to offset (with subtracted delete count)
+                indnew = index - (offver - nodelen) - delcnt + offset
+                return false
+              end
+            elseif deleted then
+              delcnt = delcnt + nodelen
+            end
+          end
+        end
+        traverse_space_dag(resource:getspace(), isanc, process_patch)
+        return indnew or index
+      end,
       prune = prune,
       sethandler = function(node, handlers)
         local mt = getmetatable(node)

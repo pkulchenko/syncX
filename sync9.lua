@@ -636,27 +636,31 @@ function M.createresource(version, elem)
         local ancvers = resource:getancestors(indexversions)
         local isver = function(nodeversion) return ancvers[nodeversion] end
         local offver = 0
-        local indnew
+        local adjustment
         local function process_patch(node, nodeversion, deleted, offset)
           -- this is the node that is known by `nodeversion`
           if ancvers[nodeversion] then
             local nodelen = node.elems:getlength()
+            -- adjustment is between the current `offset`
+            -- and the calculated position for the desired version(s)
+            -- which can be achieved over added or deleted elements
             if not node.deletedby:any(isanc) then
               offver = offver + nodelen
               if index <= offver then
-                -- index may point to some offset inside the node,
-                -- so `index - (offver - nodelen)` calculates the difference,
-                -- which is then added to offset
-                indnew = index - (offver - nodelen) + offset
+                adjustment = offset - (offver - nodelen)
                 return false
               end
             elseif not node.deletedby:any(isver) then
               offver = offver + math.min(nodelen, index-offver)
+              if index <= offver then
+                adjustment = offset - offver
+                return false
+              end
             end
           end
         end
         traverse_space_dag(resource:getspace(), isanc, process_patch)
-        return indnew or index
+        return index + (adjustment or 0)
       end,
       prune = prune,
       sethandler = function(node, handlers)

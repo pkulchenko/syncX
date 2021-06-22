@@ -636,7 +636,6 @@ function M.createresource(version, elem)
         local ancvers = resource:getancestors({[version] = true})
         local isver = function(nodeversion) return ancvers[nodeversion] end
         local offver = 0
-        local delcnt = 0
         local indnew
         local function process_patch(node, nodeversion, deleted, offset)
           -- this is the node that is known by `nodeversion`
@@ -647,12 +646,12 @@ function M.createresource(version, elem)
               if index <= offver then
                 -- index may point to some offset inside the node,
                 -- so `index - (offver - nodelen)` calculates the difference,
-                -- which is then added to offset (with subtracted delete count)
-                indnew = index - (offver - nodelen) - delcnt + offset
+                -- which is then added to offset
+                indnew = index - (offver - nodelen) + offset
                 return false
               end
             elseif not node.deletedby:any(isver) then
-              delcnt = delcnt + math.min(nodelen, index-offver)
+              offver = offver + math.min(nodelen, index-offver)
             end
           end
         end

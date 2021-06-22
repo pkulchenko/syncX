@@ -129,6 +129,21 @@ function mt.__newindex(self, key, value)
   self[mt].values[key] = value
 end
 
+function mt.__pairs(self)
+  return function(tbl, key)
+    local k, v = next(tbl[mt].values, key)
+    if nil ~= v then return k, v end
+  end, self, nil
+end
+
+function mt.__ipairs(self)
+  return function(tbl, i)
+    i = i + 1
+    local v = tbl[mt].values[i]
+    if nil ~= v then return i, v end
+  end, self, 0
+end
+
 local M = {}
 local subscriptions = {}
 function M.publish(tag, tbl)

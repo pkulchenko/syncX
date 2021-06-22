@@ -639,10 +639,10 @@ function M.createresource(version, elem)
         local delcnt = 0
         local indnew
         local function process_patch(node, nodeversion, deleted, offset)
-          -- this is the node that is known by `version`
+          -- this is the node that is known by `nodeversion`
           if ancvers[nodeversion] then
             local nodelen = node.elems:getlength()
-            if not node.deletedby:any(isver) then
+            if not node.deletedby:any(isanc) then
               offver = offver + nodelen
               if index <= offver then
                 -- index may point to some offset inside the node,
@@ -651,8 +651,8 @@ function M.createresource(version, elem)
                 indnew = index - (offver - nodelen) - delcnt + offset
                 return false
               end
-            elseif deleted then
-              delcnt = delcnt + nodelen
+            elseif not node.deletedby:any(isver) then
+              delcnt = delcnt + math.min(nodelen, index-offver)
             end
           end
         end

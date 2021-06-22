@@ -98,9 +98,6 @@ local function getnewversion(editor)
   editor.version = editor.version + 1
   return ("v%x_%x"):format(editor.version, editor:GetId())
 end
-local function getlastversion(editor)
-  return ("v%x_%x"):format(editor.version, editor:GetId())
-end
 
 local function showgraph(editor)
   -- update the graph representation
@@ -240,7 +237,7 @@ editors.editor2.cab = cabinet.publish("editor2")
 local function editorupdateui(event)
   if event:GetUpdated() ~= wxstc.wxSTC_UPDATE_SELECTION then return end
   local editor = event:GetEventObject():DynamicCast("wxStyledTextCtrl")
-  editor.cab.version = getlastversion(editor)
+  editor.cab.versions = editor.sync:getparents()
   editor.cab.cursor = editor:GetAnchor()
   editor.cab.sels = editor:GetSelectionStart()
   editor.cab.sele = editor:GetSelectionEnd()
@@ -253,7 +250,7 @@ local function updateeditor(ed)
     if key == "cursor" then
       ed:SetIndicatorCurrent(indicators.othercursor)
       ed:IndicatorClearRange(0, ed:GetLength())
-      ed:IndicatorFillRange(ed.sync:getindex(t.version, t.cursor), 1)
+      ed:IndicatorFillRange(ed.sync:getindex(t.versions, t.cursor), 1)
     else
       ed:SetIndicatorCurrent(indicators.otherselection)
       ed:IndicatorClearRange(0, ed:GetLength())
@@ -261,8 +258,8 @@ local function updateeditor(ed)
         -- selection can be done left to right or right to left,
         -- but indicators are drawn only left to right,
         -- so reverse the selection if needed
-        local sels = ed.sync:getindex(t.version, math.min(t.sels, t.sele))
-        local sele = ed.sync:getindex(t.version, math.max(t.sels, t.sele))
+        local sels = ed.sync:getindex(t.versions, math.min(t.sels, t.sele))
+        local sele = ed.sync:getindex(t.versions, math.max(t.sels, t.sele))
         ed:IndicatorFillRange(sels, sele-sels)
       end
     end

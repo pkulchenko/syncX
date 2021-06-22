@@ -625,15 +625,15 @@ function M.createresource(version, elem)
         traverse_space_dag(resource:getspace(), isanc, process_patch)
         return patchset
       end,
-      -- remap index as of a particular `version` to the current `versions`
-      getindex = function(resource, version, index, versions)
+      -- remap index as of a particular `indexversions` to the current `versions`
+      getindex = function(resource, indexversions, index, versions)
         -- if the question is about one of the "current" versions,
         -- then no remapping calculations need to be done
-        if (versions or resource.futureparents)[version] then return index end
+        if (versions or resource.futureparents):equals(indexversions) then return index end
         local ancestors = resource:getancestors(versions or resource.futureparents)
         local isanc = function(nodeversion) return ancestors[nodeversion] end
         -- assign ancestors and offset for the specified ("old") version
-        local ancvers = resource:getancestors({[version] = true})
+        local ancvers = resource:getancestors(indexversions)
         local isver = function(nodeversion) return ancvers[nodeversion] end
         local offver = 0
         local indnew
